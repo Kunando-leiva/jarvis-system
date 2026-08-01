@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚡ Puente de Mando - JARVIS</title>
+  
+  <!-- Fuentes futuristas -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Particles.js -->
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/theme-futuristic.css">
+  <link rel="stylesheet" href="css/command-center-futuristic.css">
+  
+  <style>
+    /* Estilos adicionales para el chat a pantalla completa */
+    .chat-fullscreen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .chat-messages .message {
+      display: flex;
+      gap: 12px;
+      animation: slideIn 0.3s ease;
+      max-width: 85%;
+    }
+    
+    .chat-messages .message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    
+    .chat-messages .message .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.04);
+    }
+    
+    .chat-messages .message .bubble {
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 10px 16px;
+      border: 1px solid var(--border-color);
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+      word-wrap: break-word;
+    }
+    
+    .chat-messages .message.user .bubble {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.15);
+    }
+    
+    .chat-messages .message .bubble .msg-time {
+      font-size: 0.55rem;
+      color: var(--text-secondary);
+      opacity: 0.5;
+      margin-top: 4px;
+      display: block;
+    }
+    
+    .chat-input-area {
+      display: flex;
+      gap: 10px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+    
+    .chat-input-area input {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.3);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    
+    .chat-input-area input:focus {
+      border-color: var(--accent, #00e5ff);
+    }
+    
+    .chat-input-area input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.5;
+    }
+    
+    .chat-input-area button {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent, #00e5ff);
+      color: #0a0f1e;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.8rem;
+    }
+    
+    .chat-input-area button:hover {
+      opacity: 0.85;
+      transform: scale(1.02);
+    }
+    
+    .chat-input-area button.btn-mic {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 10px 14px;
+    }
+    
+    .chat-input-area button.btn-mic:hover {
+      background: rgba(255,255,255,0.08);
+    }
+    
+    .chat-input-area button.btn-mic.listening {
+      background: rgba(255,60,60,0.15);
+      border-color: #ff6b6b;
+      color: #ff6b6b;
+      animation: pulse 0.8s infinite;
+    }
+  </style>
+</head>
+<body data-theme="JARVIS">
+  
+  <!-- ===== FONDOS ===== -->
+  <div id="space-bg"></div>
+  <div id="particles-js"></div>
+  <div class="scanline"></div>
+  
+  <!-- ===== DECORACIONES ===== -->
+  <div class="corner-decoration tl"></div>
+  <div class="corner-decoration tr"></div>
+  <div class="corner-decoration bl"></div>
+  <div class="corner-decoration br"></div>
+  
+  <!-- ===== CENTRO DE COMANDO ===== -->
+  <div class="command-center">
+    
+    <!-- HEADER -->
+    <header class="lobby-header">
+      <h1>⚡ PUENTE DE MANDO</h1>
+      <span class="status" id="status-label">🟢 Conectado</span>
+      <div class="header-actions">
+        <button id="refresh-agents" title="Actualizar agentes"><i class="fas fa-sync-alt"></i></button>
+        <button onclick="window.location.href='/'" title="Volver al inicio"><i class="fas fa-home"></i></button>
+        <button class="primary" onclick="window.open('/dashboard.html', '_blank')" title="Dashboard"><i class="fas fa-chart-bar"></i></button>
+      </div>
+    </header>
+    
+    <!-- LAYOUT PRINCIPAL -->
+    <div class="main-layout">
+      
+      <!-- SIDEBAR DE AGENTES -->
+      <div class="agents-sidebar" id="agents-sidebar">
+        <div class="sidebar-title">🤖 Agentes</div>
+        <div id="agents-grid" style="display:flex;flex-direction:column;gap:4px;width:100%;">
+          <div style="text-align:center;color:var(--text-secondary);padding:20px 0;font-size:0.7rem;opacity:0.5;">
+            ⏳ Cargando agentes...
+          </div>
+        </div>
+      </div>
+      
+      <!-- PANEL DE AGENTE (con chat a pantalla completa) -->
+      <div class="agent-panel" id="agent-panel">
+        
+        <!-- HEADER DEL AGENTE -->
+        <div class="panel-header" id="panel-header" style="--agent-color:#00e5ff;">
+          <span class="panel-icon" id="panel-icon">🧠</span>
+          <div>
+            <span class="panel-title" id="panel-title">JARVIS</span>
+            <span class="panel-status online" id="panel-status">● ONLINE</span>
+          </div>
+          <span style="margin-left:auto;font-size:0.6rem;color:var(--text-secondary);" id="panel-agent-id">
+            🆔 jarvis
+          </span>
+        </div>
+        
+        <!-- DESCRIPCIÓN -->
+        <div class="panel-description" id="panel-description">
+          Planificador estratégico y coordinador de agentes
+        </div>
+        
+        <!-- ESTADÍSTICAS -->
+        <div class="panel-stats" id="panel-stats">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-tasks">0</div>
+            <div class="stat-label">Tareas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-avg">--</div>
+            <div class="stat-label">Promedio</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-messages">0</div>
+            <div class="stat-label">Mensajes</div>
+          </div>
+        </div>
+        
+        <!-- ACCIONES RÁPIDAS -->
+        <div class="panel-actions" id="panel-actions">
+          <button class="primary" onclick="window.sendQuickPrompt('Saludar')">👋 Saludar</button>
+          <button class="primary" onclick="window.sendQuickPrompt('Ayúdame a planificar mi semana')">📋 Planificar</button>
+          <button class="primary" onclick="window.sendQuickPrompt('Resumen de tus capacidades')">📖 Resumen</button>
+          <button onclick="window.toggleAgent()" id="btn-toggle-agent">⛔ Desactivar</button>
+        </div>
+        
+        <!-- CHAT A PANTALLA COMPLETA -->
+        <div class="chat-fullscreen">
+          <div class="chat-messages" id="chat-messages">
+            <!-- Los mensajes se renderizan aquí -->
+            <div style="color:var(--text-secondary);text-align:center;padding:40px;font-size:0.85rem;opacity:0.6;">
+              <i class="fas fa-comment" style="font-size:2rem;display:block;margin-bottom:12px;opacity:0.3;"></i>
+              Selecciona un agente para comenzar<br>
+              <span style="font-size:0.7rem;">o escribe un mensaje abajo</span>
+            </div>
+          </div>
+          
+          <!-- INPUT DE CHAT -->
+          <div class="chat-input-area">
+            <input id="chat-input" type="text" placeholder="💬 Escribe un mensaje para el agente..." autocomplete="off">
+            <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
+            <button id="mic-btn" class="btn-mic"><i class="fas fa-microphone"></i></button>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+  
+  <!-- ===== SCRIPTS ===== -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module">
+    // ─── IMPORTS DE LOS DOCKS ──────────────────────────────────────
+    import { JarvisDock } from './agent-docks/dock-jarvis.js';
+    import { GideonDock } from './agent-docks/dock-gideon.js';
+    import { ContentCreatorDock } from './agent-docks/dock-content-creator.js';
+    import { KillCodeDock } from './agent-docks/dock-kill-code.js';
+    import { KillResearchDock } from './agent-docks/dock-kill-research.js';
+    import { KillWriteDock } from './agent-docks/dock-kill-write.js';
+    import { HeimdallDock } from './agent-docks/dock-heimdall.js';
+    import { KillDock } from './agent-docks/dock-kill.js';
+    import { InstagramAutomatorDock } from './agent-docks/dock-instagram-automator.js';
+    import { VideoGeneratorDock } from './agent-docks/dock-video-generator.js';
+
+    window.agentHistory = {};
+
+    // ─── MAPA DE DOCKS ──────────────────────────────────────────────
+    const DOCK_MAP = {
+      'jarvis': JarvisDock,
+      'gideon': GideonDock,
+      'content-creator': ContentCreatorDock,
+      'kill-code': KillCodeDock,
+      'kill-research': KillResearchDock,
+      'kill-write': KillWriteDock,
+      'heimdall': HeimdallDock,
+      'kill': KillDock,
+      'instagram-automator': InstagramAutomatorDock,
+      'video-generator': VideoGeneratorDock
+    };
+
+    // ─── SOCKET ──────────────────────────────────────────────────────
+    const socket = io('http://localhost:5000');
+    const agentsGrid = document.getElementById('agents-grid');
+    let agentsCache = [];
+    let currentAgentId = 'jarvis';
+    let currentDockInstance = null;
+    let isVoiceEnabled = false;
+    let isListening = false;
+    let recognition = null;
+
+    // ─── ELEMENTOS DOM ─────────────────────────────────────────────
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const micBtn = document.getElementById('mic-btn');
+    const statusLabel = document.getElementById('status-label');
+    
+    // Elementos del panel
+    const panelIcon = document.getElementById('panel-icon');
+    const panelTitle = document.getElementById('panel-title');
+    const panelStatus = document.getElementById('panel-status');
+    const panelAgentId = document.getElementById('panel-agent-id');
+    const panelDescription = document.getElementById('panel-description');
+    const statTasks = document.getElementById('stat-tasks');
+    const statAvg = document.getElementById('stat-avg');
+    const statMessages = document.getElementById('stat-messages');
+    const panelActions = document.getElementById('panel-actions');
+
+    // ─── RENDERIZAR AGENTES ──────────────────────────────────────────
+    function renderAgents(agents) {
+      agentsCache = agents;
+      if (!agents || agents.length === 0) {
+        agentsGrid.innerHTML = `
+          <div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:0.7rem;opacity:0.5;">
+            No hay agentes disponibles
+          </div>
+        `;
+        return;
+      }
+
+      agentsGrid.innerHTML = agents.map(agent => {
+        const color = agent.color || '#00e5ff';
+        const statusClass = agent.status || 'idle';
+        return `
+          <div class="agent-card ${currentAgentId === agent.id ? 'active' : ''}" 
+               style="--agent-color:${color}; --agent-glow:${color}44;"
+               onclick="window.selectAgent('${agent.id}')"
+               data-agent-id="${agent.id}">
+            <div class="agent-icon">${agent.icon || '🤖'}</div>
+            <div class="agent-info">
+              <div class="agent-name">${agent.name}</div>
+              <div class="agent-desc">${agent.description || 'Agente del sistema'}</div>
+            </div>
+            <span class="agent-status-badge ${statusClass}">${statusClass}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── SELECCIONAR AGENTE ──────────────────────────────────────────
+    window.selectAgent = function(agentId) {
+      currentAgentId = agentId;
+      
+      // Actualizar sidebar
+      document.querySelectorAll('.agent-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.agentId === agentId);
+      });
+      
+      const agent = agentsCache.find(a => a.id === agentId);
+      if (!agent) return;
+      
+      // Actualizar panel
+      const color = agent.color || '#00e5ff';
+      panelIcon.textContent = agent.icon || '🤖';
+      panelTitle.textContent = agent.name;
+      panelTitle.style.color = color;
+      panelStatus.textContent = agent.status === 'idle' ? '● INACTIVO' : '● ONLINE';
+      panelStatus.className = `panel-status ${agent.status === 'idle' ? 'offline' : 'online'}`;
+      panelAgentId.textContent = `🆔 ${agent.id}`;
+      panelDescription.textContent = agent.description || 'Sin descripción';
+      
+      // Estadísticas
+      const history = window.agentHistory[agentId] || [];
+      const tasks = agent.metrics?.tasksProcessed || 0;
+      const avgTime = agent.metrics?.avgResponseTime || 0;
+      statTasks.textContent = tasks;
+      statAvg.textContent = avgTime > 0 ? avgTime.toFixed(1) + 's' : '--';
+      statMessages.textContent = history.length;
+      
+      // Botón toggle
+      const toggleBtn = document.getElementById('btn-toggle-agent');
+      toggleBtn.textContent = agent.enabled !== false ? '⛔ Desactivar' : '✅ Activar';
+      
+      // Limpiar mensajes
+      chatMessages.innerHTML = '';
+      
+      // Mostrar mensaje de bienvenida
+      addMessage('system', `🤖 Conectado a **${agent.name}**`, color);
+      
+      // Cargar historial
+      history.slice(-20).forEach(msg => {
+        if (msg.role === 'user') {
+          addMessage('user', msg.text);
+        } else if (msg.role === agentId) {
+          addMessage('agent', msg.text, color, agent.icon);
+        }
+      });
+      
+      // Actualizar placeholder
+      chatInput.placeholder = `💬 Mensaje para ${agent.name}...`;
+      
+      // Actualizar fondo del chat
+      document.querySelector('.chat-fullscreen').style.borderColor = color + '44';
+    };
+
+    // ─── AGREGAR MENSAJE AL CHAT ────────────────────────────────────
+    function addMessage(type, text, color = '#00e5ff', icon = '🤖') {
+      const div = document.createElement('div');
+      div.className = `message ${type === 'user' ? 'user' : ''}`;
+      
+      const avatar = type === 'user' ? '👤' : (icon || '🤖');
+      const name = type === 'user' ? 'Tú' : (type === 'system' ? 'Sistema' : currentAgentId.toUpperCase());
+      
+      div.innerHTML = `
+        <div class="avatar">${avatar}</div>
+        <div class="bubble" style="${type === 'agent' ? 'border-color:' + color + '44;' : ''}">
+          ${formatMessage(text)}
+          <span class="msg-time">${new Date().toLocaleTimeString()}</span>
+        </div>
+      `;
+      
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // ─── FORMATEAR MENSAJE ──────────────────────────────────────────
+    function formatMessage(text) {
+      if (!text) return '';
+      let formatted = text;
+      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      formatted = formatted.replace(/^# (.*)$/gm, '<h3>$1</h3>');
+      formatted = formatted.replace(/^---$/gm, '<span class="separator"></span>');
+      formatted = formatted.replace(/^-\s(.*)$/gm, '• $1');
+      formatted = formatted.replace(/^(\d+)\.\s(.*)$/gm, '<span style="color:var(--accent);font-weight:bold;">$1.</span> $2');
+      formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+      formatted = formatted.replace(/```([\s\S]*?)```/g, function(match, code) {
+        return '<pre><code>' + code.trim() + '</code></pre>';
+      });
+      formatted = formatted.replace(/\n/g, '<br>');
+      return formatted;
+    }
+
+    // ─── ENVIAR MENSAJE ─────────────────────────────────────────────
+    function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      
+      // Comandos
+      if (text.startsWith('/')) {
+        handleCommand(text);
+        chatInput.value = '';
+        return;
+      }
+      
+      // Guardar en historial
+      if (!window.agentHistory[currentAgentId]) {
+        window.agentHistory[currentAgentId] = [];
+      }
+      window.agentHistory[currentAgentId].push({
+        role: 'user',
+        text: text,
+        time: new Date().toLocaleTimeString()
+      });
+      
+      // Mostrar mensaje
+      addMessage('user', text);
+      
+      // Enviar al agente
+      socket.emit('agent:message', {
+        agentId: currentAgentId,
+        message: text,
+        context: { source: 'command-center' }
+      });
+      
+      chatInput.value = '';
+    }
+
+    // ─── COMANDOS ────────────────────────────────────────────────────
+    function handleCommand(text) {
+      const lower = text.toLowerCase().trim();
+      
+      if (lower === '/help') {
+        addMessage('system', `
+          📖 **Comandos disponibles:**
+          /jarvis - Cambiar a JARVIS
+          /gideon - Cambiar a GIDEON
+          /heimdall - Cambiar a HEIMDALL
+          /kill - Cambiar a KILL
+          /clear - Limpiar pantalla
+          /voice - Activar/Desactivar voz
+          /help - Mostrar esta ayuda
+        `);
+        return;
+      }
+      
+      if (lower === '/clear') {
+        chatMessages.innerHTML = '';
+        return;
+      }
+      
+      if (lower === '/voice') {
+        isVoiceEnabled = !isVoiceEnabled;
+        addMessage('system', `🔊 Voz ${isVoiceEnabled ? 'activada' : 'desactivada'}`);
+        return;
+      }
+      
+      const agentMap = {
+        'jarvis': 'jarvis',
+        'gideon': 'gideon',
+        'heimdall': 'heimdall',
+        'kill': 'kill',
+        'kill-research': 'kill-research',
+        'kill-write': 'kill-write',
+        'kill-code': 'kill-code',
+        'content-creator': 'content-creator'
+      };
+      
+      for (const [key, id] of Object.entries(agentMap)) {
+        if (lower === '/' + key) {
+          window.selectAgent(id);
+          return;
+        }
+      }
+      
+      addMessage('system', `❌ Comando "${text}" no reconocido. Usá /help`);
+    }
+
+    // ─── ACCIONES RÁPIDAS ──────────────────────────────────────────
+    window.sendQuickPrompt = function(message) {
+      chatInput.value = message;
+      sendMessage();
+    };
+
+    // ─── TOGGLE AGENTE ─────────────────────────────────────────────
+    window.toggleAgent = function() {
+      const agent = agentsCache.find(a => a.id === currentAgentId);
+      if (!agent) return;
+      const newState = !agent.enabled;
+      socket.emit('agent:toggle', { agentId: currentAgentId, enabled: newState });
+      setTimeout(() => socket.emit('agents:request'), 500);
+    };
+
+    // ─── SOCKET EVENTOS ────────────────────────────────────────────
+    socket.on('agents:list', renderAgents);
+    socket.emit('agents:request');
+
+    socket.on('agent:response', (data) => {
+      const agentId = data.agentId || 'jarvis';
+      const text = data.result?.text || '✅ Procesado';
+      const agent = agentsCache.find(a => a.id === agentId);
+      
+      if (agentId === currentAgentId) {
+        addMessage('agent', text, agent?.color || '#00e5ff', agent?.icon || '🤖');
+        
+        // Actualizar estadísticas
+        if (agent) {
+          statTasks.textContent = agent.metrics?.tasksProcessed || 0;
+          const avg = agent.metrics?.avgResponseTime || 0;
+          statAvg.textContent = avg > 0 ? avg.toFixed(1) + 's' : '--';
+        }
+        
+        // Voz
+        if (isVoiceEnabled && text.length > 5) {
+          speakText(text);
+        }
+      }
+    });
+
+    socket.on('agent:error', (data) => {
+      if (data.agentId === currentAgentId) {
+        addMessage('system', `❌ Error: ${data.error || 'Error desconocido'}`);
+      }
+    });
+
+    socket.on('connect', () => {
+      statusLabel.textContent = '🟢 Conectado';
+      statusLabel.style.color = '#00c853';
+      socket.emit('agents:request');
+    });
+
+    socket.on('disconnect', () => {
+      statusLabel.textContent = '🔴 Desconectado';
+      statusLabel.style.color = '#ff6b6b';
+    });
+
+    // ─── TEXTO A VOZ ───────────────────────────────────────────────
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      const clean = text.replace(/[\[\]\(\)\*\_\#\n]/g, '').trim();
+      if (clean.length < 3) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'es-ES';
+      utterance.rate = 0.85;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ─── MICRÓFONO ──────────────────────────────────────────────────
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      
+      recognition.onresult = (event) => {
+        chatInput.value = event.results[0][0].transcript;
+        micBtn.classList.remove('listening');
+        isListening = false;
+        setTimeout(sendMessage, 300);
+      };
+      
+      recognition.onerror = () => {
+        micBtn.classList.remove('listening');
+        isListening = false;
+      };
+      
+      recognition.onend = () => {
+        micBtn.classList.remove('listening');
+        isListening = false;
+      };
+      
+      micBtn.addEventListener('click', () => {
+        if (isListening) {
+          recognition.stop();
+          return;
+        }
+        micBtn.classList.add('listening');
+        isListening = true;
+        recognition.start();
+      });
+    } else {
+      micBtn.style.opacity = '0.3';
+      micBtn.title = 'Micrófono no soportado';
+    }
+
+    // ─── EVENTOS DE UI ─────────────────────────────────────────────
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    document.getElementById('refresh-agents')?.addEventListener('click', () => {
+      socket.emit('agents:request');
+    });
+
+    // ─── PARTICULAS ──────────────────────────────────────────────────
+    if (typeof particlesJS !== 'undefined') {
+      particlesJS('particles-js', {
+        particles: {
+          number: { value: 80, density: { enable: true, value_area: 800 } },
+          color: { value: '#00e5ff' },
+          shape: { type: 'circle' },
+          opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1 } },
+          size: { value: 2, random: true, anim: { enable: true, speed: 2, size_min: 0.1 } },
+          line_linked: { enable: true, distance: 150, color: '#00e5ff', opacity: 0.2, width: 1 },
+          move: { enable: true, speed: 1, direction: 'none', random: true, straight: false, out_mode: 'out' }
+        },
+        interactivity: {
+          detect_on: 'canvas',
+          events: { onhover: { enable: true, mode: 'repulse' }, onclick: { enable: true, mode: 'push' } }
+        },
+        retina_detect: true
+      });
+    }
+
+    // ─── SELECCIONAR JARVIS POR DEFECTO ────────────────────────────
+    setTimeout(() => {
+      window.selectAgent('jarvis');
+    }, 500);
+
+    console.log('⚡ Puente de Mando Futurista cargado');
+    console.log('🤖 Agentes disponibles:', Object.keys(DOCK_MAP).join(', '));
+  </script>
+</body>
+</html>

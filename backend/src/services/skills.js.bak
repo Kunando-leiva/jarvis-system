@@ -1,0 +1,8 @@
+function calcularPresupuesto(horas, precioPorHora) {
+  let total = horas * precioPorHora;
+  if (horas > 100) {
+    let descuento = total * 0.10;
+    total -= descuento;
+  }
+  return total;
+}

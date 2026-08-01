@@ -1,0 +1,55 @@
+/* frontend/css/theme.css */
+/* Temas de la aplicación (JARVIS, GIDEON, HEIMDALL) */
+
+:root {
+  --accent: #00e5ff;
+  --accent-dim: rgba(0, 229, 255, 0.15);
+  --accent-glow: rgba(0, 229, 255, 0.6);
+  --accent-core: #e0fbff;
+  --bg-primary: #0a0f1e;
+  --bg-secondary: #0d1428;
+  --bg-card: rgba(13, 20, 40, 0.85);
+  --text-primary: #e8edf5;
+  --text-secondary: #8892a8;
+  --text-muted: #4a5a6a;
+  --border-color: rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── TEMA JARVIS ────────────────────────────────────────────── */
+.theme-jarvis {
+  --accent: #00e5ff;
+  --accent-dim: rgba(0, 229, 255, 0.15);
+  --accent-glow: rgba(0, 229, 255, 0.6);
+  --accent-core: #e0fbff;
+}
+
+/* ─── TEMA GIDEON ────────────────────────────────────────────── */
+.theme-gideon {
+  --accent: #ffb800;
+  --accent-dim: rgba(255, 184, 0, 0.15);
+  --accent-glow: rgba(255, 184, 0, 0.6);
+  --accent-core: #fff4dc;
+}
+
+/* ─── TEMA HEIMDALL ──────────────────────────────────────────── */
+.theme-heimdall {
+  --accent: #00ff88;
+  --accent-dim: rgba(0, 255, 136, 0.15);
+  --accent-glow: rgba(0, 255, 136, 0.6);
+  --accent-core: #d4fff0;
+}
+
+/* ─── TEMA KILL ──────────────────────────────────────────────── */
+.theme-kill {
+  --accent: #ff0044;
+  --accent-dim: rgba(255, 0, 68, 0.15);
+  --accent-glow: rgba(255, 0, 68, 0.6);
+  --accent-core: #ffd4dc;
+}
+
+/* ─── APLICAR TEMA ───────────────────────────────────────────── */
+body[data-theme="JARVIS"] { --accent: #00e5ff; --accent-dim: rgba(0,229,255,0.15); --accent-glow: rgba(0,229,255,0.6); --accent-core: #e0fbff; }
+body[data-theme="GIDEON"] { --accent: #ffb800; --accent-dim: rgba(255,184,0,0.15); --accent-glow: rgba(255,184,0,0.6); --accent-core: #fff4dc; }
+body[data-theme="HEIMDALL"] { --accent: #00ff88; --accent-dim: rgba(0,255,136,0.15); --accent-glow: rgba(0,255,136,0.6); --accent-core: #d4fff0; }
+body[data-theme="KILL"] { --accent: #ff0044; --accent-dim: rgba(255,0,68,0.15); --accent-glow: rgba(255,0,68,0.6); --accent-core: #ffd4dc; }

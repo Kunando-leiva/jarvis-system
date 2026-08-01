@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Dashboard - JARVIS Metrics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --accent: #00e5ff;
+      --accent-dim: rgba(0, 229, 255, 0.12);
+      --accent-glow: rgba(0, 229, 255, 0.25);
+      --bg-primary: #070b14;
+      --bg-card: rgba(18, 24, 45, 0.92);
+      --text-primary: #e8edf5;
+      --text-secondary: #8892a8;
+      --border-color: rgba(255, 255, 255, 0.06);
+      --font-mono: 'Courier New', monospace;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: 
+        radial-gradient(ellipse at 20% 50%, rgba(0, 229, 255, 0.03) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(255, 184, 0, 0.02) 0%, transparent 40%),
+        radial-gradient(ellipse at bottom, #0d1b2a, #070b14);
+      z-index: -1;
+    }
+
+    .dashboard { max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00e5ff, #ffb800);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header h1 .badge {
+      font-size: 0.5rem;
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 20px;
+      padding: 2px 10px;
+      color: var(--accent);
+      -webkit-text-fill-color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .header-actions button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: rgba(255,255,255,0.04);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.7rem;
+      transition: all 0.3s;
+      font-family: var(--font-mono);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .header-actions button:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: var(--accent);
+      color: var(--text-primary);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .header-actions button.primary {
+      background: var(--accent);
+      color: #0a0f1e;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .header-actions button.primary:hover {
+      background: #00d4e6;
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 18px 20px;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      backdrop-filter: blur(8px);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.3;
+      border-radius: 0 3px 3px 0;
+      transition: opacity 0.3s;
+    }
+    .card:hover {
+      border-color: rgba(0, 229, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .card:hover::before { opacity: 1; }
+    .card .card-title {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+    }
+    .card .card-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      font-family: var(--font-mono);
+    }
+    .card .card-sub {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .card .card-icon {
+      font-size: 1.6rem;
+      float: right;
+      opacity: 0.6;
+    }
+    .card .card-status {
+      font-size: 0.6rem;
+      padding: 2px 10px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-top: 6px;
+    }
+    .card .card-status.online { background: rgba(0, 200, 83, 0.15); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
+    .card .card-status.offline { background: rgba(255, 60, 60, 0.15); color: #ff6b6b; border: 1px solid rgba(255,60,60,0.2); }
+    .card .card-status.warning { background: rgba(255, 184, 0, 0.15); color: #ffb800; border: 1px solid rgba(255,184,0,0.2); }
+    .card .card-status.excellent { background: rgba(0, 229, 255, 0.15); color: #00e5ff; border: 1px solid rgba(0,229,255,0.2); }
+
+    .chart-container {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 18px 20px;
+      height: 300px;
+      position: relative;
+      backdrop-filter: blur(8px);
+      transition: all 0.3s;
+    }
+    .chart-container:hover { border-color: rgba(0, 229, 255, 0.2); }
+    .chart-container h4 {
+      color: var(--text-secondary);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      font-family: var(--font-mono);
+    }
+    .chart-container .chart-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 80%;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      opacity: 0.6;
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin: 20px 0 12px 0;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border-color), transparent);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s infinite;
+    }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    .timestamp {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      text-align: right;
+      margin-top: 16px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 12px;
+      font-family: var(--font-mono);
+      opacity: 0.5;
+    }
+
+    .best-times-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px;
+    }
+    .best-time-item {
+      background: rgba(0, 229, 255, 0.04);
+      border: 1px solid rgba(0, 229, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .best-time-item:hover {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.2);
+    }
+    .best-time-item .hour {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .best-time-item .engagement {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    .recommendation-card {
+      background: rgba(0, 229, 255, 0.04);
+      border: 1px solid rgba(0, 229, 255, 0.1);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      transition: all 0.3s;
+    }
+    .recommendation-card:hover {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.2);
+    }
+    .recommendation-card .rec-title {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+    .recommendation-card .rec-desc {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+    .recommendation-card .rec-priority {
+      font-size: 0.6rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .rec-priority.alta { background: rgba(255, 60, 60, 0.15); color: #ff6b6b; border: 1px solid rgba(255,60,60,0.2); }
+    .rec-priority.media { background: rgba(255, 184, 0, 0.15); color: #ffb800; border: 1px solid rgba(255,184,0,0.2); }
+    .rec-priority.baja { background: rgba(0, 229, 255, 0.15); color: #00e5ff; border: 1px solid rgba(0,229,255,0.2); }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1a2a3a; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a3a4a; }
+
+    @media (max-width: 768px) {
+      .header { flex-direction: column; align-items: stretch; padding: 16px; }
+      .header h1 { font-size: 1rem; }
+      .grid { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .chart-container { height: 220px; }
+      .best-times-grid { grid-template-columns: repeat(3, 1fr); }
+      body { padding: 12px; }
+    }
+    @media (max-width: 480px) {
+      .best-times-grid { grid-template-columns: repeat(2, 1fr); }
+      .card .card-value { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard">
+    <!-- HEADER -->
+    <header class="header">
+      <h1>⚡ DASHBOARD <span class="badge">v2.0</span></h1>
+      <div class="header-actions">
+        <button onclick="loadAllMetrics()">🔄 Sync</button>
+        <button onclick="window.location.href='/'">🏠 Bridge</button>
+        <button class="primary" onclick="window.location.href='/command-center.html'">🎯 Command</button>
+      </div>
+    </header>
+
+    <!-- MÉTRICAS DE JARVIS -->
+    <div id="jarvis-metrics"><div class="loading">⏳ Inicializando JARVIS</div></div>
+
+    <!-- MÉTRICAS DE INSTAGRAM -->
+    <div id="instagram-metrics"><div class="loading">⏳ Conectando a Instagram API</div></div>
+
+    <!-- RECOMENDACIONES DE GROWTH -->
+    <div id="growth-recommendations">
+      <h3 class="section-title">📈 RECOMENDACIONES DE GROWTH</h3>
+      <div id="growth-content">
+        <div class="loading">⏳ Generando recomendaciones...</div>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="grid-2" id="charts-section">
+      <div class="chart-container">
+        <h4>📈 Evolución Semanal</h4>
+        <canvas id="weeklyChart"></canvas>
+      </div>
+      <div class="chart-container">
+        <h4>📊 Comparativa Mensual</h4>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- MEJORES HORARIOS -->
+    <div id="best-times-section"><div class="loading">⏳ Analizando métricas temporales</div></div>
+
+    <!-- TIMESTAMP -->
+    <div class="timestamp" id="timestamp">🔄 Sincronizando con el servidor...</div>
+  </div>
+
+  <script>
+    let weeklyChart = null;
+    let monthlyChart = null;
+
+    // ============================================================
+    // 1. CARGAR MÉTRICAS
+    // ============================================================
+    async function loadAllMetrics() {
+      try {
+        document.getElementById('jarvis-metrics').innerHTML = '<div class="loading">⏳ Cargando JARVIS</div>';
+        document.getElementById('instagram-metrics').innerHTML = '<div class="loading">⏳ Cargando Instagram</div>';
+        document.getElementById('growth-content').innerHTML = '<div class="loading">⏳ Generando recomendaciones...</div>';
+
+        const response = await fetch('/api/metrics/dashboard/full');
+        const result = await response.json();
+
+        if (result.success) {
+          const data = result.data || {};
+          
+          // Extraer datos
+          const accountData = data.account?.cuenta || data.account || {};
+          const insightsData = data.account?.insights || {};
+          const postsData = data.posts || [];
+          const bestTimesData = data.bestTimes || { bestHours: [], bestDays: [] };
+          const timelineData = data.timeline || { data: [] };
+          const systemData = data.system || { uptime: '0m', totalMessages: 0, totalErrors: 0, activeAgents: 7, totalAgents: 7 };
+          const engagementData = data.account?.engagement || {};
+          
+          renderJarvisMetrics({ system: systemData });
+          renderInstagramMetrics(accountData, insightsData, engagementData);
+          renderBestTimes(bestTimesData);
+          renderCharts(postsData, timelineData);
+          renderGrowthRecommendations(accountData, insightsData, engagementData, postsData);
+          
+          document.getElementById('timestamp').textContent = `✅ Actualizado: ${new Date().toLocaleString()}`;
+        } else {
+          throw new Error(result.error || 'Error desconocido');
+        }
+      } catch (error) {
+        console.error('Error cargando métricas:', error);
+        document.getElementById('jarvis-metrics').innerHTML = `<div class="loading">❌ Error: ${error.message}</div>`;
+        document.getElementById('timestamp').textContent = `❌ Error: ${new Date().toLocaleString()}`;
+      }
+    }
+
+    // ============================================================
+    // 2. RENDERIZAR MÉTRICAS DE JARVIS
+    // ============================================================
+    function renderJarvisMetrics(metrics) {
+      const system = metrics.system || {};
+      const uptime = system.uptime || '0m';
+      const totalMessages = system.totalMessages || 0;
+      const totalErrors = system.totalErrors || 0;
+      const activeAgents = system.activeAgents || 7;
+      const totalAgents = system.totalAgents || 7;
+      
+      document.getElementById('jarvis-metrics').innerHTML = `
+        <h3 class="section-title">🧠 JARVIS · Sistema Operativo</h3>
+        <div class="grid">
+          <div class="card">
+            <span class="card-icon">⏱️</span>
+            <div class="card-title">Uptime</div>
+            <div class="card-value">${uptime}</div>
+            <div class="card-sub">🟢 Sistema estable</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">💬</span>
+            <div class="card-title">Mensajes</div>
+            <div class="card-value">${totalMessages}</div>
+            <div class="card-sub">Procesados</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">🤖</span>
+            <div class="card-title">Agentes</div>
+            <div class="card-value">${activeAgents}/${totalAgents}</div>
+            <div class="card-sub">${activeAgents === totalAgents ? '✅ Todos activos' : '⚠️ Algunos inactivos'}</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">❌</span>
+            <div class="card-title">Errores</div>
+            <div class="card-value">${totalErrors}</div>
+            <div class="card-sub">${totalErrors > 0 ? '⚠️ Revisar logs' : '✅ Sin errores'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // 3. RENDERIZAR MÉTRICAS DE INSTAGRAM
+    // ============================================================
+    function renderInstagramMetrics(accountData, insightsData, engagementData) {
+      const followers = accountData.seguidores || 0;
+      const mediaCount = accountData.publicaciones || 0;
+      const username = accountData.username || '--';
+      const nombre = accountData.nombre || 'Reino de Valhalla';
+      const biografia = accountData.biografia || '';
+
+      const totalLikes = engagementData.likes || 0;
+      const totalComments = engagementData.comentarios || 0;
+      const totalReach = engagementData.alcance || 0;
+      const totalSaved = engagementData.guardados || 0;
+      const totalShares = engagementData.compartidos || 0;
+      const engagementRate = engagementData.engagement_rate || 0;
+
+      let ratingText = '📊 Sin datos';
+      let ratingClass = 'offline';
+      if (engagementRate > 200) { ratingText = '🚀 Excelente'; ratingClass = 'excellent'; }
+      else if (engagementRate > 100) { ratingText = '📈 Bueno'; ratingClass = 'online'; }
+      else if (engagementRate > 50) { ratingText = '📊 Regular'; ratingClass = 'warning'; }
+      else if (engagementRate > 0) { ratingText = '📉 Bajo'; ratingClass = 'offline'; }
+
+      document.getElementById('instagram-metrics').innerHTML = `
+        <h3 class="section-title">📱 Instagram · ${nombre}</h3>
+        <div class="grid">
+          <div class="card">
+            <span class="card-icon">👥</span>
+            <div class="card-title">Seguidores</div>
+            <div class="card-value">${followers}</div>
+            <div class="card-sub">@${username}</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">📸</span>
+            <div class="card-title">Publicaciones</div>
+            <div class="card-value">${mediaCount}</div>
+            <div class="card-sub">Total en el perfil</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">📊</span>
+            <div class="card-title">Alcance</div>
+            <div class="card-value">${totalReach}</div>
+            <div class="card-sub">Últimos 30 días</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔥</span>
+            <div class="card-title">Engagement Rate</div>
+            <div class="card-value">${engagementRate.toFixed(1)}%</div>
+            <div class="card-sub"><span class="card-status ${ratingClass}">${ratingText}</span></div>
+          </div>
+          <div class="card">
+            <span class="card-icon">❤️</span>
+            <div class="card-title">Likes</div>
+            <div class="card-value">${totalLikes}</div>
+            <div class="card-sub">Últimos 30 días</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">💬</span>
+            <div class="card-title">Comentarios</div>
+            <div class="card-value">${totalComments}</div>
+            <div class="card-sub">Últimos 30 días</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">💾</span>
+            <div class="card-title">Guardados</div>
+            <div class="card-value">${totalSaved}</div>
+            <div class="card-sub">Últimos 30 días</div>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔄</span>
+            <div class="card-title">Compartidos</div>
+            <div class="card-value">${totalShares}</div>
+            <div class="card-sub">Últimos 30 días</div>
+          </div>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-secondary);padding:4px 0;font-family:var(--font-mono);opacity:0.5;">
+          📝 ${biografia.substring(0, 100)}${biografia.length > 100 ? '...' : ''}
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // 4. RENDERIZAR RECOMENDACIONES DE GROWTH
+    // ============================================================
+    function renderGrowthRecommendations(accountData, insightsData, engagementData, postsData) {
+      const followers = accountData.seguidores || 0;
+      const totalLikes = engagementData.likes || 0;
+      const totalComments = engagementData.comentarios || 0;
+      const totalSaved = engagementData.guardados || 0;
+      const totalShares = engagementData.compartidos || 0;
+      const engagementRate = engagementData.engagement_rate || 0;
+
+      let recomendaciones = [];
+
+      // 1. Recomendación de seguidores
+      if (followers < 100) {
+        recomendaciones.push({
+          titulo: '📈 Crecimiento de Audiencia',
+          descripcion: 'Tienes pocos seguidores. Publica Reels al menos 3 veces por semana y usa hashtags relevantes.',
+          prioridad: 'alta'
+        });
+      } else if (followers < 500) {
+        recomendaciones.push({
+          titulo: '📈 Escalar Audiencia',
+          descripcion: 'Sigue creciendo. Colabora con cuentas similares y usa historias diarias para mantener engagement.',
+          prioridad: 'media'
+        });
+      } else {
+        recomendaciones.push({
+          titulo: '✅ Base Sólida',
+          descripcion: 'Tienes buena base de seguidores. Enfócate en monetizar y fidelizar.',
+          prioridad: 'baja'
+        });
+      }
+
+      // 2. Recomendación de engagement
+      if (engagementRate < 50) {
+        recomendaciones.push({
+          titulo: '🔥 Mejorar Engagement',
+          descripcion: 'Tu engagement es bajo. Añade preguntas al final de tus videos y responde todos los comentarios.',
+          prioridad: 'alta'
+        });
+      } else if (engagementRate < 100) {
+        recomendaciones.push({
+          titulo: '📊 Optimizar Engagement',
+          descripcion: 'Tu engagement es aceptable. Prueba diferentes formatos y horarios para mejorarlo.',
+          prioridad: 'media'
+        });
+      } else {
+        recomendaciones.push({
+          titulo: '🚀 Engagement Excelente',
+          descripcion: 'Tu contenido conecta muy bien con la audiencia. Sigue así y experimenta con nuevos formatos.',
+          prioridad: 'baja'
+        });
+      }
+
+      // 3. Recomendación de guardados
+      if (totalSaved < 10) {
+        recomendaciones.push({
+          titulo: '💾 Aumentar Guardados',
+          descripcion: 'Tus publicaciones no se guardan mucho. Crea contenido de utilidad (datos curiosos, listas, consejos).',
+          prioridad: 'media'
+        });
+      }
+
+      // 4. Recomendación de compartidos
+      if (totalShares < 5) {
+        recomendaciones.push({
+          titulo: '🔄 Fomentar Compartidos',
+          descripcion: 'Poco compartido. Invita a tu audiencia a etiquetar a otros: "Comparte con un amigo que..."',
+          prioridad: 'media'
+        });
+      }
+
+      // 5. Recomendación de comentarios
+      if (totalComments < 20) {
+        recomendaciones.push({
+          titulo: '💬 Generar Conversación',
+          descripcion: 'Pocos comentarios. Haz preguntas directas al final de tus videos.',
+          prioridad: 'alta'
+        });
+      }
+
+      // Generar HTML
+      let html = `<div class="grid-3">`;
+      
+      if (recomendaciones.length === 0) {
+        html += `<div class="card" style="grid-column:1/-1;text-align:center;padding:30px;">
+          <div style="font-size:2rem;margin-bottom:10px;">🏆</div>
+          <div style="color:var(--accent);font-weight:700;">¡Todo está en orden!</div>
+          <div style="color:var(--text-secondary);font-size:0.8rem;">Tu cuenta está en excelente estado. Sigue así.</div>
+        </div>`;
+      } else {
+        for (const rec of recomendaciones) {
+          html += `
+            <div class="recommendation-card">
+              <div class="rec-title">${rec.titulo}</div>
+              <div class="rec-desc">${rec.descripcion}</div>
+              <span class="rec-priority ${rec.prioridad}">${rec.prioridad.toUpperCase()}</span>
+            </div>
+          `;
+        }
+      }
+      
+      html += `</div>`;
+      document.getElementById('growth-content').innerHTML = html;
+    }
+
+    // ============================================================
+    // 5. RENDERIZAR MEJORES HORARIOS
+    // ============================================================
+    function renderBestTimes(data) {
+      const bestHours = data.bestHours || [];
+      const bestDays = data.bestDays || [];
+
+      let html = `
+        <h3 class="section-title">🕐 Mejores Horarios para Publicar</h3>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">⏰ Mejores Horas</div>
+            <div class="best-times-grid">
+      `;
+
+      if (bestHours.length === 0) {
+        html += `<div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:12px;font-size:0.8rem;">⚠️ No hay suficientes datos</div>`;
+      } else {
+        bestHours.slice(0, 5).forEach(item => {
+          const hourStr = String(item.hour).padStart(2, '0') + ':00';
+          html += `
+            <div class="best-time-item">
+              <div class="hour">${hourStr}</div>
+              <div class="engagement">${item.count} posts · ${Math.round(item.engagement)} interacciones</div>
+            </div>
+          `;
+        });
+      }
+
+      html += `
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">📅 Mejores Días</div>
+            <div class="best-times-grid">
+      `;
+
+      if (bestDays.length === 0) {
+        html += `<div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:12px;font-size:0.8rem;">⚠️ No hay suficientes datos</div>`;
+      } else {
+        bestDays.slice(0, 7).forEach(item => {
+          html += `
+            <div class="best-time-item">
+              <div class="hour">${item.dayName}</div>
+              <div class="engagement">${item.count} posts · ${Math.round(item.engagement)} interacciones</div>
+            </div>
+          `;
+        });
+      }
+
+      html += `
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('best-times-section').innerHTML = html;
+    }
+
+    // ============================================================
+    // 6. RENDERIZAR GRÁFICOS
+    // ============================================================
+    function renderCharts(posts, timeline) {
+      const postsArray = Array.isArray(posts) ? posts : [];
+      const sortedPosts = postsArray.length > 0 ? [...postsArray].sort((a, b) => {
+        const dateA = new Date(a.fecha || a.timestamp);
+        const dateB = new Date(b.fecha || b.timestamp);
+        return dateA - dateB;
+      }) : [];
+      
+      if (sortedPosts.length === 0) {
+        const container1 = document.getElementById('weeklyChart')?.parentElement;
+        const container2 = document.getElementById('monthlyChart')?.parentElement;
+        if (container1) container1.innerHTML = '<div class="chart-empty">📊 No hay publicaciones</div>';
+        if (container2) container2.innerHTML = '<div class="chart-empty">📊 No hay publicaciones</div>';
+        return;
+      }
+
+      const weekLabels = [];
+      const weekLikes = [];
+      const weekComments = [];
+      const now = new Date();
+      
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        weekLabels.push(date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
+        
+        const dayPosts = sortedPosts.filter(p => {
+          const fecha = p.fecha || p.timestamp;
+          if (!fecha) return false;
+          const pDate = new Date(fecha);
+          return pDate.toDateString() === date.toDateString();
+        });
+        
+        weekLikes.push(dayPosts.reduce((sum, p) => sum + (p.likes || p.like_count || 0), 0));
+        weekComments.push(dayPosts.reduce((sum, p) => sum + (p.comentarios || p.comments_count || 0), 0));
+      }
+
+      const monthLabels = [];
+      const monthLikes = [];
+      const monthComments = [];
+      
+      for (let i = 3; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - (i * 7));
+        monthLabels.push(`Sem ${4 - i}`);
+        
+        const weekStart = new Date(date);
+        weekStart.setDate(weekStart.getDate() - 3);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        const weekPosts = sortedPosts.filter(p => {
+          const fecha = p.fecha || p.timestamp;
+          if (!fecha) return false;
+          const pDate = new Date(fecha);
+          return pDate >= weekStart && pDate <= weekEnd;
+        });
+        
+        monthLikes.push(weekPosts.reduce((sum, p) => sum + (p.likes || p.like_count || 0), 0));
+        monthComments.push(weekPosts.reduce((sum, p) => sum + (p.comentarios || p.comments_count || 0), 0));
+      }
+
+      if (weeklyChart) { weeklyChart.destroy(); weeklyChart = null; }
+      if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
+
+      const ctx1 = document.getElementById('weeklyChart');
+      if (ctx1) {
+        weeklyChart = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: weekLabels,
+            datasets: [
+              { label: 'Likes', data: weekLikes, backgroundColor: 'rgba(0, 229, 255, 0.6)', borderColor: '#00e5ff', borderWidth: 1, borderRadius: 4 },
+              { label: 'Comentarios', data: weekComments, backgroundColor: 'rgba(255, 184, 0, 0.6)', borderColor: '#ffb800', borderWidth: 1, borderRadius: 4 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#c9d1e0', font: { size: 10, family: "'Courier New', monospace" } } } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: '#6a7a8a', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              x: { ticks: { color: '#6a7a8a', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+          }
+        });
+      }
+
+      const ctx2 = document.getElementById('monthlyChart');
+      if (ctx2) {
+        monthlyChart = new Chart(ctx2, {
+          type: 'line',
+          data: {
+            labels: monthLabels,
+            datasets: [
+              { label: 'Likes', data: monthLikes, borderColor: '#00e5ff', backgroundColor: 'rgba(0, 229, 255, 0.08)', fill: true, tension: 0.3, pointBackgroundColor: '#00e5ff', pointRadius: 3 },
+              { label: 'Comentarios', data: monthComments, borderColor: '#ffb800', backgroundColor: 'rgba(255, 184, 0, 0.08)', fill: true, tension: 0.3, pointBackgroundColor: '#ffb800', pointRadius: 3 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#c9d1e0', font: { size: 10, family: "'Courier New', monospace" } } } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: '#6a7a8a', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              x: { ticks: { color: '#6a7a8a', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+          }
+        });
+      }
+    }
+
+    // ============================================================
+    // 7. CARGA INICIAL
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAllMetrics();
+      setInterval(loadAllMetrics, 300000);
+    });
+  </script>
+</body>
+</html>
