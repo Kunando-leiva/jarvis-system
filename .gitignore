@@ -1,0 +1,26 @@
+# Archivos de entorno y secretos
+.env
+*.env
+*.env.local
+*.env.*
+backend/.env
+
+# Firebase
+backend/serviceAccountKey.json
+
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# WhatsApp
+backend/whatsapp-session.json
+
+# Temporales
+backend/temp/
+backend/*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+nul
