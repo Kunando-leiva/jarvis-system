@@ -5,7 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+     "start": "node server.js",
+    "db:view": "node scripts/view-db.js",
+    "db:clear": "node scripts/clear-db.js",
+    "db:backup": "node scripts/backup-db.js"
   },
   "keywords": [],
   "author": "",

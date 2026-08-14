@@ -4,20 +4,20 @@ export const AI_PROVIDERS = {
   GROQ: {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
     key: process.env.GROQ_API_KEY,
   },
   GEMINI: {
     name: 'gemini',
     url: (key, model) =>
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     key: process.env.GEMINI_API_KEY,
   },
   OPENROUTER: {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free',
+    model: process.env.OPENROUTER_MODEL || 'llama-3.1-8b-instant',
     key: process.env.OPENROUTER_API_KEY,
   },
 };

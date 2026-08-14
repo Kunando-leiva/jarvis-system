@@ -6,6 +6,7 @@ import { getAIResponse } from '../controllers/aiController.js';
 import { ContentCreatorAgent } from './contentCreatorAgent.js';
 import { VideoGeneratorAgent } from './videoGeneratorAgent.js';
 import { GrowthMarketerAgent } from './growthMarketerAgent.js';
+import SystemMonitorAgent from './systemMonitorAgent.js';
 
 
 // ──────────────────────────────────────────────────────────────
@@ -553,7 +554,7 @@ export class AgentRegistry {
     this.register(new InstagramAutomatorAgent());
     this.register(new VideoGeneratorAgent()); // ← IMPORTACIÓN DIRECTA
     this.register(new GrowthMarketerAgent());
-    
+    this.register(new SystemMonitorAgent());
   }
 
   

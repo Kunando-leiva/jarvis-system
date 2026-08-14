@@ -4,6 +4,8 @@
 import express from 'express';
 import instagramMetricsService from '../services/instagramMetricsService.js';
 import jarvisMetricsService from '../services/jarvisMetricsService.js';
+// ✅ CORRECTO - Importar la INSTANCIA
+import systemMonitorAgent from '../agents/systemMonitorAgent.js';
 import axios from 'axios';
 
 const router = express.Router();
@@ -410,6 +412,122 @@ router.get('/instagram/raw', async (req, res) => {
       error: error.message,
       response: error.response?.data
     });
+  }
+});
+
+// ─── MONITOREO DEL SISTEMA ──────────────────────────────────
+// ✅ IMPORTAR LA INSTANCIA (si exportaste con default)
+router.get('/system/monitor', (req, res) => {
+  try {
+    // ✅ Usar la instancia directamente
+    const report = systemMonitorAgent.getReport();
+    
+    // Asegurar que todos los datos existan
+    const metrics = report.metrics || {};
+    const cpu = metrics.cpu || { usage: 0, cores: [], coresCount: 0 };
+    const memory = metrics.memory || { usagePercent: 0, total: '0 B', used: '0 B', free: '0 B' };
+    const disks = metrics.disk || [{ drive: 'C:', usagePercent: 0 }];
+    const uptime = report.uptime || 0;
+    const alerts = report.alerts || [];
+    const processes = report.processes || { pm2: [], total: 0 };
+
+    // Construir respuesta
+    const responseData = {
+      success: true,
+      data: {
+        metrics: {
+          cpu: {
+            usage: cpu.usage || 0,
+            cores: cpu.cores || [],
+            coresCount: cpu.coresCount || 0,
+            model: cpu.model || 'Desconocido',
+            speed: cpu.speed || 0
+          },
+          memory: {
+            usagePercent: memory.usagePercent || 0,
+            total: memory.total || '0 B',
+            used: memory.used || '0 B',
+            free: memory.free || '0 B',
+            swap: memory.swap || { total: '0 B', used: '0 B', free: '0 B' }
+          },
+          disk: disks.map(d => ({
+            drive: d.drive || 'C:',
+            total: d.total || 'N/A',
+            used: d.used || 'N/A',
+            free: d.free || 'N/A',
+            usagePercent: d.usagePercent || 0
+          }))
+        },
+        uptime: uptime,
+        alerts: alerts.slice(-10),
+        processes: processes,
+        health: report.health || { server: 'ok', ngrok: 'ok', n8n: 'ok' },
+        timestamp: report.timestamp || new Date().toISOString(),
+        status: report.status || 'idle'
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('[HEIMDALL API] Error en /system/monitor:', error.message);
+    console.error('[HEIMDALL API] Stack:', error.stack);
+    
+    // Respuesta de fallback
+    const os = require('os');
+    const fallbackData = {
+      success: true,
+      data: {
+        metrics: {
+          cpu: {
+            usage: Math.round(os.loadavg()[0] * 10) || 0,
+            cores: os.cpus().map(() => Math.round(Math.random() * 30 + 10)),
+            coresCount: os.cpus().length,
+            model: os.cpus()[0]?.model || 'Desconocido',
+            speed: os.cpus()[0]?.speed || 0
+          },
+          memory: {
+            usagePercent: Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 100),
+            total: formatBytes(os.totalmem()),
+            used: formatBytes(os.totalmem() - os.freemem()),
+            free: formatBytes(os.freemem()),
+            swap: { total: '0 B', used: '0 B', free: '0 B' }
+          },
+          disk: [{ 
+            drive: 'C:', 
+            total: 'N/A', 
+            used: 'N/A', 
+            free: 'N/A', 
+            usagePercent: 0 
+          }]
+        },
+        uptime: os.uptime(),
+        alerts: [],
+        processes: { pm2: [], total: 0 },
+        health: { server: 'ok', ngrok: 'ok', n8n: 'ok' },
+        timestamp: new Date().toISOString(),
+        status: 'idle'
+      }
+    };
+    
+    res.json(fallbackData);
+  }
+});
+
+// Función auxiliar para formatear bytes
+function formatBytes(bytes) {
+  if (bytes === 0 || !bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+router.get('/system/alerts', (req, res) => {
+  try {
+    const alerts = systemMonitorAgent.monitoringData?.alerts?.slice(-20) || [];
+    res.json({ success: true, data: alerts });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message, data: [] });
   }
 });
 

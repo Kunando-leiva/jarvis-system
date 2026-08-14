@@ -1,79 +1,82 @@
+// backend/src/services/memoryService.js
+// 🧠 SERVICIO DE MEMORIA CON SQLITE - PERSISTENTE Y SIN DEPENDENCIAS EXTERNAS
+
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-import { createRequire } from 'module';
+import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
 
 // =============================================
-// 🔥 IMPORTAR FIREBASE ADMIN (con require)
+// 📁 CONFIGURACIÓN DE BASE DE DATOS SQLITE
 // =============================================
 
-let admin = null;
+const DB_PATH = path.join(__dirname, '../../memory.db');
 let db = null;
-let isFirebaseConnected = false;
 
+// Inicializar SQLite
 try {
-  // Usar require para importar firebase-admin
-  admin = require('firebase-admin');
-  console.log('[Firebase] ✅ firebase-admin importado correctamente');
-  console.log('[Firebase] 📦 Versión:', admin.SDK_VERSION || 'desconocida');
-} catch (error) {
-  console.error('[Firebase] ❌ Error importando firebase-admin:', error.message);
-  console.log('[Firebase] ⚠️ Usando modo simulado');
-}
-
-// =============================================
-// 🔥 INICIALIZAR FIREBASE
-// =============================================
-
-if (admin) {
-  try {
-    // Ruta al archivo de clave de servicio
-    const serviceAccountPath = path.join(__dirname, '../../serviceAccountKey.json');
-    console.log(`[Firebase] 📁 Buscando clave en: ${serviceAccountPath}`);
+    db = new Database(DB_PATH);
+    console.log('[Memory] ✅ SQLite inicializado en:', DB_PATH);
     
-    if (fs.existsSync(serviceAccountPath)) {
-      console.log('[Firebase] ✅ Archivo de clave encontrado');
-      
-      // Leer el archivo JSON manualmente
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      
-      // Verificar que admin tiene credential
-      if (admin.credential && typeof admin.credential.cert === 'function') {
-        console.log('[Firebase] ✅ admin.credential.cert disponible');
+    // Crear tablas si no existen
+    db.exec(`
+        -- Tabla de sesiones
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            context TEXT,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
         
-        if (!admin.apps || admin.apps.length === 0) {
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-          });
-          console.log('[Firebase] ✅ Inicializado con clave de servicio');
-        } else {
-          console.log('[Firebase] ✅ Ya inicializado');
-        }
+        -- Tabla de mensajes
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        );
         
-        db = admin.firestore();
-        isFirebaseConnected = true;
-        console.log('[Firebase] ✅ Firestore listo para usar');
-        console.log(`[Firebase] 📁 Proyecto: ${serviceAccount.project_id}`);
-      } else {
-        console.log('[Firebase] ❌ admin.credential.cert NO disponible');
-        console.log('[Firebase] 🔍 admin.credential:', admin.credential);
-        console.log('[Firebase] ⚠️ Usando modo simulado');
-      }
-    } else {
-      console.log('[Firebase] ⚠️ No se encontró serviceAccountKey.json');
-      console.log('[Firebase] 💡 Coloca el archivo en: backend/serviceAccountKey.json');
-      console.log('[Firebase] ⚠️ Usando modo simulado');
+        -- Tabla de publicaciones
+        CREATE TABLE IF NOT EXISTS publications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titulo TEXT NOT NULL,
+            post_id TEXT,
+            success INTEGER DEFAULT 0,
+            metadata TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- Tabla de estado del sistema
+        CREATE TABLE IF NOT EXISTS system_state (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- Índices para mejorar rendimiento
+        CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_publications_timestamp ON publications(timestamp);
+    `);
+    
+    console.log('[Memory] ✅ Tablas creadas/verificadas');
+    
+    // Verificar que funciona
+    const test = db.prepare('SELECT 1 as test').get();
+    if (test) {
+        console.log('[Memory] ✅ Base de datos funcionando correctamente');
     }
-  } catch (error) {
-    console.error('[Firebase] ❌ Error:', error.message);
-    console.log('[Firebase] ⚠️ Usando modo simulado');
-  }
-} else {
-  console.log('[Firebase] ⚠️ Modo simulado (firebase-admin no disponible)');
+    
+} catch (error) {
+    console.error('[Memory] ❌ Error inicializando SQLite:', error.message);
+    console.log('[Memory] ⚠️ Usando modo memoria temporal');
+    // Fallback: base de datos en memoria
+    db = new Database(':memory:');
 }
 
 // =============================================
@@ -81,194 +84,226 @@ if (admin) {
 // =============================================
 
 class MemoryService {
-  
-  async saveMessage(sessionId, role, content, metadata = {}) {
-    try {
-      if (!isFirebaseConnected) {
-        console.log(`[Memory] 💾 [SIMULADO] ${role}: ${content.substring(0, 50)}...`);
-        return true;
-      }
-      
-      const messageRef = db.collection('sessions').doc(sessionId).collection('messages');
-      await messageRef.add({
-        role,
-        content,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        metadata,
-      });
-      
-      console.log(`[Memory] 💾 Mensaje guardado en sesión: ${sessionId}`);
-      return true;
-    } catch (error) {
-      console.error('[Memory] ❌ Error guardando mensaje:', error.message);
-      return false;
+    
+    // ─── GUARDAR MENSAJE ──────────────────────────────────────────
+    async saveMessage(sessionId, role, content, metadata = {}) {
+        try {
+            // Asegurar que la sesión existe
+            this._ensureSession(sessionId);
+            
+            const stmt = db.prepare(`
+                INSERT INTO messages (session_id, role, content, metadata)
+                VALUES (?, ?, ?, ?)
+            `);
+            
+            stmt.run(sessionId, role, content, JSON.stringify(metadata));
+            
+            console.log(`[Memory] 💾 Mensaje guardado: ${sessionId} - ${role}`);
+            return true;
+        } catch (error) {
+            console.error('[Memory] ❌ Error guardando mensaje:', error.message);
+            return false;
+        }
     }
-  }
-
-  async getConversationHistory(sessionId, limit = 20) {
-    try {
-      if (!isFirebaseConnected) {
-        return [];
-      }
-      
-      const messagesRef = db.collection('sessions').doc(sessionId).collection('messages');
-      const snapshot = await messagesRef
-        .orderBy('timestamp', 'desc')
-        .limit(limit)
-        .get();
-      
-      const messages = [];
-      snapshot.forEach(doc => {
-        messages.push({ id: doc.id, ...doc.data() });
-      });
-      
-      return messages.reverse();
-    } catch (error) {
-      console.error('[Memory] ❌ Error obteniendo historial:', error.message);
-      return [];
+    
+    // ─── OBTENER HISTORIAL ──────────────────────────────────────
+    async getConversationHistory(sessionId, limit = 20) {
+        try {
+            const stmt = db.prepare(`
+                SELECT id, role, content, timestamp, metadata
+                FROM messages
+                WHERE session_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            `);
+            
+            const rows = stmt.all(sessionId, limit);
+            
+            // Convertir timestamps y parsear metadata
+            return rows.map(row => ({
+                ...row,
+                timestamp: row.timestamp,
+                metadata: row.metadata ? JSON.parse(row.metadata) : {}
+            })).reverse();
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error obteniendo historial:', error.message);
+            return [];
+        }
     }
-  }
-
-  async saveContext(sessionId, context) {
-    try {
-      if (!isFirebaseConnected) {
-        console.log(`[Memory] 📝 [SIMULADO] Contexto guardado`);
-        return true;
-      }
-      
-      await db.collection('sessions').doc(sessionId).set({
-        context,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      
-      console.log(`[Memory] 📝 Contexto guardado para sesión: ${sessionId}`);
-      return true;
-    } catch (error) {
-      console.error('[Memory] ❌ Error guardando contexto:', error.message);
-      return false;
+    
+    // ─── GUARDAR CONTEXTO ────────────────────────────────────────
+    async saveContext(sessionId, context) {
+        try {
+            this._ensureSession(sessionId);
+            
+            // Obtener contexto existente
+            const existing = db.prepare('SELECT context FROM sessions WHERE session_id = ?').get(sessionId);
+            let mergedContext = context;
+            
+            if (existing && existing.context) {
+                try {
+                    const oldContext = JSON.parse(existing.context);
+                    mergedContext = { ...oldContext, ...context };
+                } catch (e) {
+                    // Si no se puede parsear, usar el nuevo
+                }
+            }
+            
+            const stmt = db.prepare(`
+                UPDATE sessions 
+                SET context = ?, last_updated = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+            `);
+            
+            stmt.run(JSON.stringify(mergedContext), sessionId);
+            
+            console.log(`[Memory] 📝 Contexto guardado para: ${sessionId}`);
+            return true;
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error guardando contexto:', error.message);
+            return false;
+        }
     }
-  }
-
-  async getContext(sessionId) {
-    try {
-      if (!isFirebaseConnected) {
-        return {};
-      }
-      
-      const doc = await db.collection('sessions').doc(sessionId).get();
-      if (doc.exists) {
-        return doc.data().context || {};
-      }
-      return {};
-    } catch (error) {
-      console.error('[Memory] ❌ Error obteniendo contexto:', error.message);
-      return {};
+    
+    // ─── OBTENER CONTEXTO ────────────────────────────────────────
+    async getContext(sessionId) {
+        try {
+            const stmt = db.prepare('SELECT context FROM sessions WHERE session_id = ?');
+            const row = stmt.get(sessionId);
+            
+            if (row && row.context) {
+                try {
+                    return JSON.parse(row.context);
+                } catch (e) {
+                    return {};
+                }
+            }
+            return {};
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error obteniendo contexto:', error.message);
+            return {};
+        }
     }
-  }
-
-  async savePublication(publicationData) {
-    try {
-      if (!isFirebaseConnected) {
-        console.log(`[Memory] 📤 [SIMULADO] Publicación: ${publicationData.titulo}`);
-        return true;
-      }
-      
-      await db.collection('publications').add({
-        ...publicationData,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      
-      console.log(`[Memory] 📤 Publicación guardada: ${publicationData.titulo}`);
-      return true;
-    } catch (error) {
-      console.error('[Memory] ❌ Error guardando publicación:', error.message);
-      return false;
+    
+    // ─── GUARDAR PUBLICACIÓN ────────────────────────────────────
+    async savePublication(publicationData) {
+        try {
+            const stmt = db.prepare(`
+                INSERT INTO publications (titulo, post_id, success, metadata)
+                VALUES (?, ?, ?, ?)
+            `);
+            
+            stmt.run(
+                publicationData.titulo,
+                publicationData.postId || null,
+                publicationData.success ? 1 : 0,
+                JSON.stringify(publicationData.metadata || {})
+            );
+            
+            console.log(`[Memory] 📤 Publicación guardada: ${publicationData.titulo}`);
+            return true;
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error guardando publicación:', error.message);
+            return false;
+        }
     }
-  }
-
-  async getPublications(limit = 50) {
-    try {
-      if (!isFirebaseConnected) {
-        return [];
-      }
-      
-      const snapshot = await db.collection('publications')
-        .orderBy('timestamp', 'desc')
-        .limit(limit)
-        .get();
-      
-      const publications = [];
-      snapshot.forEach(doc => {
-        publications.push({ id: doc.id, ...doc.data() });
-      });
-      
-      return publications;
-    } catch (error) {
-      console.error('[Memory] ❌ Error obteniendo publicaciones:', error.message);
-      return [];
+    
+    // ─── OBTENER PUBLICACIONES ──────────────────────────────────
+    async getPublications(limit = 50) {
+        try {
+            const stmt = db.prepare(`
+                SELECT id, titulo, post_id, success, metadata, timestamp
+                FROM publications
+                ORDER BY timestamp DESC
+                LIMIT ?
+            `);
+            
+            const rows = stmt.all(limit);
+            
+            return rows.map(row => ({
+                ...row,
+                success: row.success === 1,
+                metadata: row.metadata ? JSON.parse(row.metadata) : {},
+                timestamp: row.timestamp
+            }));
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error obteniendo publicaciones:', error.message);
+            return [];
+        }
     }
-  }
-
-  async saveSystemState(state) {
-    try {
-      if (!isFirebaseConnected) {
-        console.log(`[Memory] 💻 [SIMULADO] Estado: ${state.mode}`);
-        return true;
-      }
-      
-      await db.collection('system').doc('state').set({
-        ...state,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      
-      console.log('[Memory] 💻 Estado del sistema guardado');
-      return true;
-    } catch (error) {
-      console.error('[Memory] ❌ Error guardando estado:', error.message);
-      return false;
+    
+    // ─── GUARDAR ESTADO DEL SISTEMA ─────────────────────────────
+    async saveSystemState(state) {
+        try {
+            const stmt = db.prepare(`
+                INSERT OR REPLACE INTO system_state (key, value, last_updated)
+                VALUES ('system_state', ?, CURRENT_TIMESTAMP)
+            `);
+            
+            stmt.run(JSON.stringify(state));
+            
+            console.log('[Memory] 💻 Estado del sistema guardado');
+            return true;
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error guardando estado:', error.message);
+            return false;
+        }
     }
-  }
-
-  async getSystemState() {
-    try {
-      if (!isFirebaseConnected) {
-        return { mode: 'JARVIS' };
-      }
-      
-      const doc = await db.collection('system').doc('state').get();
-      if (doc.exists) {
-        return doc.data();
-      }
-      return { mode: 'JARVIS' };
-    } catch (error) {
-      console.error('[Memory] ❌ Error obteniendo estado:', error.message);
-      return { mode: 'JARVIS' };
+    
+    // ─── OBTENER ESTADO DEL SISTEMA ─────────────────────────────
+    async getSystemState() {
+        try {
+            const stmt = db.prepare('SELECT value FROM system_state WHERE key = ?');
+            const row = stmt.get('system_state');
+            
+            if (row && row.value) {
+                try {
+                    return JSON.parse(row.value);
+                } catch (e) {
+                    return { mode: 'JARVIS' };
+                }
+            }
+            return { mode: 'JARVIS' };
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error obteniendo estado:', error.message);
+            return { mode: 'JARVIS' };
+        }
     }
-  }
-
-  async clearSession(sessionId) {
-    try {
-      if (!isFirebaseConnected) {
-        console.log(`[Memory] 🧹 [SIMULADO] Historial limpiado`);
-        return true;
-      }
-      
-      const messagesRef = db.collection('sessions').doc(sessionId).collection('messages');
-      const snapshot = await messagesRef.get();
-      
-      const batch = db.batch();
-      snapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-      
-      console.log(`[Memory] 🧹 Historial limpiado para sesión: ${sessionId}`);
-      return true;
-    } catch (error) {
-      console.error('[Memory] ❌ Error limpiando historial:', error.message);
-      return false;
+    
+    // ─── LIMPIAR SESIÓN ──────────────────────────────────────────
+    async clearSession(sessionId) {
+        try {
+            // Eliminar mensajes
+            db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+            // Eliminar contexto
+            db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
+            
+            console.log(`[Memory] 🧹 Sesión limpiada: ${sessionId}`);
+            return true;
+            
+        } catch (error) {
+            console.error('[Memory] ❌ Error limpiando sesión:', error.message);
+            return false;
+        }
     }
-  }
+    
+    // ─── PRIVADO: Asegurar que la sesión existe ────────────────
+    _ensureSession(sessionId) {
+        const stmt = db.prepare(`
+            INSERT OR IGNORE INTO sessions (session_id, context)
+            VALUES (?, '{}')
+        `);
+        stmt.run(sessionId);
+    }
 }
 
-export default new MemoryService();
+// Exportar la instancia
+const memoryService = new MemoryService();
+export default memoryService;

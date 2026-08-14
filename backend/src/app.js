@@ -158,15 +158,15 @@ setTimeout(async () => {
 }, 3000);
 
 // ─── WHATSAPP ──────────────────────────────────────────────────
-setTimeout(async () => {
-  try {
-    console.log('[WhatsApp] 📱 Iniciando WhatsApp...');
-    await whatsappService.init();
-    console.log('[WhatsApp] ✅ WhatsApp listo!');
-  } catch (error) {
-    console.error('[WhatsApp] ❌ Error iniciando:', error.message);
-    console.log('[WhatsApp] ⚠️ WhatsApp no disponible. Inicia manualmente con POST /api/whatsapp/start');
-  }
-}, 5000);
+// setTimeout(async () => {
+//   try {
+//     console.log('[WhatsApp] 📱 Iniciando WhatsApp...');
+//     await whatsappService.init();
+//     console.log('[WhatsApp] ✅ WhatsApp listo!');
+//   } catch (error) {
+//     console.error('[WhatsApp] ❌ Error iniciando:', error.message);
+//     console.log('[WhatsApp] ⚠️ WhatsApp no disponible. Inicia manualmente con POST /api/whatsapp/start');
+//   }
+// }, 5000);
 
 export { app, server, io };
