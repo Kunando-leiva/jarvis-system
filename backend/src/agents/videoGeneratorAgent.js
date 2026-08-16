@@ -5,7 +5,6 @@ import { BaseAgent } from './BaseAgent.js';
 import fooocusService from '../services/fooocusService.js';
 import instagramPublishService from '../services/instagramPublishService.js';
 import storageService from '../services/storageService.js';
-import { agentRegistry } from './index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -47,6 +46,15 @@ export class VideoGeneratorAgent extends BaseAgent {
     // Almacenar última imagen y video generados
     this.lastGeneratedImage = null;
     this.lastGeneratedVideo = null;
+    // 🔥 AGREGAR: Referencia al registry (se inyecta desde fuera)
+    this._agentRegistry = null;
+  }
+
+  // 🔥 MÉTODO PARA INYECTAR EL REGISTRY DESDE FUERA
+  setAgentRegistry(registry) {
+    this._agentRegistry = registry;
+    console.log('[VideoGeneratorAgent] ✅ Registry inyectado correctamente');
+    return this;
   }
 
   // ================================================================
@@ -217,8 +225,8 @@ ${prompt}
     }
 
     try {
-      // 1. Verificar que CONTENT-CREATOR está disponible
-      const contentCreator = agentRegistry.getAgent('content-creator');
+      // 🔥 USAR this._agentRegistry en lugar de agentRegistry
+      const contentCreator = this._agentRegistry?.getAgent('content-creator');
       if (!contentCreator) {
         return {
           text: `❌ El agente CONTENT-CREATOR no está disponible.\n\n💡 Asegúrate de que esté registrado en agentRegistry.`,
@@ -344,7 +352,8 @@ ${tema}
       
       // PASO 1: Generar guión
       steps.push('📝 Generando guión con CONTENT-CREATOR...');
-      const contentCreator = agentRegistry.getAgent('content-creator');
+      // 🔥 USAR this._agentRegistry en lugar de agentRegistry
+      const contentCreator = this._agentRegistry?.getAgent('content-creator');
       if (!contentCreator) {
         return {
           text: `❌ El agente CONTENT-CREATOR no está disponible.`,
@@ -642,4 +651,6 @@ ${modelList}
   }
 }
 
-export default new VideoGeneratorAgent();
+// 🔥 NO exportamos una instancia aquí para evitar el import cíclico.
+// La instancia se creará en index.js con el registry inyectado.
+// export default new VideoGeneratorAgent(); // <-- ELIMINAR ESTA LÍNEA

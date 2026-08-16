@@ -552,9 +552,15 @@ export class AgentRegistry {
     this.register(new KillCodeAgent());
     this.register(new ContentCreatorAgent());
     this.register(new InstagramAutomatorAgent());
-    this.register(new VideoGeneratorAgent()); // ← IMPORTACIÓN DIRECTA
     this.register(new GrowthMarketerAgent());
     this.register(new SystemMonitorAgent());
+    // 🔥 VIDEO-GENERATOR - CREAR INSTANCIA E INYECTAR REGISTRY
+const videoGenerator = new VideoGeneratorAgent();
+videoGenerator.setAgentRegistry(this); // Inyectar el registry
+this.register(videoGenerator);
+
+this.register(new GrowthMarketerAgent());
+this.register(new SystemMonitorAgent());
   }
 
   

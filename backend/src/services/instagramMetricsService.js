@@ -1,5 +1,5 @@
 // backend/src/services/instagramMetricsService.js
-// Servicio de métricas de Instagram - VERSIÓN COMPLETA
+// Servicio de métricas de Instagram - VERSIÓN LIMPIA Y CORREGIDA
 
 import axios from 'axios';
 
@@ -21,37 +21,12 @@ class InstagramMetricsService {
       
       const url = `${this.baseUrl}/${this.igUserId}`;
       const params = {
-        fields: 'id,username,name,biography,followers_count,follows_count,media_count,business_account',
-        access_token: this.accessToken
-      };
-      
-      const response = await axios.get(url, { params, timeout: 10000 });
-      console.log(`[Instagram Metrics] ✅ Datos obtenidos: ${response.data.followers_count} seguidores, ${response.data.media_count} publicaciones`);
-      return response.data;
-      
-    } catch (error) {
-      console.error('[Instagram Metrics] ❌ Error obteniendo datos de cuenta:', error.message);
-      throw new Error(`No se pudieron obtener datos: ${error.message}`);
-    }
-  }
-
-    /**
-   * OBTENER DATOS BÁSICOS DE LA CUENTA (SIN business_account)
-   */
-  async _fetchAccountData() {
-    try {
-      console.log('[Instagram Metrics] 📡 Obteniendo datos de la cuenta...');
-      
-      const url = `${this.baseUrl}/${this.igUserId}`;
-      const params = {
-        // 🔥 ELIMINADO business_account
         fields: 'id,username,name,biography,followers_count,follows_count,media_count',
         access_token: this.accessToken
       };
       
       const response = await axios.get(url, { params, timeout: 10000 });
-      
-      console.log(`[Instagram Metrics] ✅ Datos reales: ${response.data.followers_count} seguidores, ${response.data.media_count} publicaciones`);
+      console.log(`[Instagram Metrics] ✅ Datos obtenidos: ${response.data.followers_count} seguidores, ${response.data.media_count} publicaciones`);
       return response.data;
       
     } catch (error) {
@@ -110,7 +85,7 @@ class InstagramMetricsService {
     return 'Sin datos';
   }
 
-    /**
+  /**
    * OBTENER TODAS LAS MÉTRICAS REALES DE LA CUENTA
    */
   async getAccountMetrics() {
@@ -126,7 +101,7 @@ class InstagramMetricsService {
         console.warn('[Instagram Metrics] ⚠️ No se pudo obtener datos de cuenta:', e.message);
       }
       
-      // 2. Publicaciones recientes (REALES) - ESTO SIEMPRE FUNCIONA
+      // 2. Publicaciones recientes (REALES)
       const postsData = await this._fetchRecentPosts(20);
       console.log(`[Instagram Metrics] ✅ Publicaciones: ${postsData.length} posts`);
       
@@ -160,7 +135,6 @@ class InstagramMetricsService {
           categoria: accountData.category || 'No especificada'
         },
         insights: {
-          // Estos vienen de las publicaciones (100% reales)
           alcance_total: { valor: totalReach, disponible: totalReach > 0 },
           likes_totales: { valor: totalLikes, disponible: totalLikes > 0 },
           comentarios_totales: { valor: totalComments, disponible: totalComments > 0 },
@@ -267,8 +241,6 @@ class InstagramMetricsService {
       const posts = await this._fetchRecentPosts(5);
       const allComments = [];
       for (const post of posts) {
-        // Los comentarios no se pueden obtener directamente con esta API
-        // Se necesita otra llamada por cada post
         try {
           const url = `${this.baseUrl}/${post.id}/comments`;
           const params = {

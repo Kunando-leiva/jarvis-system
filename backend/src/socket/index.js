@@ -88,6 +88,7 @@ export function setupSocket(server) {
 // ─── MENSAJES DE USUARIO ──────────────────────────────
 socket.on('user-message', async (message, options = {}) => {
   try {
+    // 🔥 USAR EL SESSION ID ENVIADO DESDE EL FRONTEND
     const sessionId = options.sessionId || `frontend_${socket.id}`;
     
     console.log(`[Memory] 📝 Sesión: ${sessionId}`);
@@ -96,85 +97,118 @@ socket.on('user-message', async (message, options = {}) => {
     // 🔥 GUARDAR MENSAJE DEL USUARIO
     await memoryService.saveMessage(sessionId, 'user', message);
     
+    // 🔥 OBTENER CONTEXTO ANTERIOR
     let contextoAnterior = {};
     try {
       contextoAnterior = await memoryService.getContext(sessionId);
     } catch (error) {}
 
+    // Detectar cambio de modo
     const requestedMode = detectModeSwitch(message);
-
     if (requestedMode && requestedMode !== getCurrentMode()) {
       setCurrentMode(requestedMode);
       io.emit('state-change', { mode: getCurrentMode() });
       console.log(`[state] modo cambiado a ${getCurrentMode()}`);
     }
 
-    // 🔥 OBTENER HISTORIAL COMPLETO
-    const historial = await memoryService.getConversationHistory(sessionId, 10);
+    // 🔥 OBTENER HISTORIAL COMPLETO (ÚLTIMOS 15 MENSAJES)
+    const historial = await memoryService.getConversationHistory(sessionId, 15);
     
+    // Obtener el system prompt base (TU PROMPT)
     let systemPrompt = await getSystemPrompt(getCurrentMode());
     
-    // 🔥 CONSTRUIR CONTEXTO CON EL HISTORIAL COMPLETO - VERSIÓN MEJORADA
+    // ─── CONSTRUIR CONTEXTO DE FORMA INTELIGENTE ───
     if (historial && historial.length > 0) {
-      let contextoCompleto = '\n\n⚠️ **HISTORIAL DE CONVERSACIÓN (IMPORTANTE):**\n';
-      
-      // Mostrar TODOS los mensajes relevantes
-      for (const msg of historial) {
-        const rol = msg.role === 'user' ? '👤 Usuario' : '🤖 JARVIS';
-        contextoCompleto += `\n${rol}: ${msg.content}`;
-      }
-      
-      // 🔥 EXTRAER INFORMACIÓN CLAVE DEL HISTORIAL
-      contextoCompleto += `\n\n📌 **INFORMACIÓN QUE DEBES RECORDAR:**`;
-      
+      // Extraer información clave del historial de forma inteligente
       const textoCompleto = historial.map(m => m.content).join(' ');
       
-      // Buscar colores
-      const colores = ['amarillo', 'azul', 'rojo', 'verde', 'negro', 'blanco', 'morado', 'naranja', 'rosa', 'gris', 'marrón', 'violeta', 'celeste', 'turquesa', 'fucsia', 'bordo', 'beige', 'ocre', 'carmesí', 'esmeralda', 'rubí', 'zafiro'];
-      for (const color of colores) {
-        if (textoCompleto.toLowerCase().includes(color)) {
-          contextoCompleto += `\n- Color favorito: ${color}`;
-          break;
+      // Detectar si el usuario está preguntando por algo específico
+      const preguntandoColor = /color|favorito|preferido|amarillo|azul|rojo|verde|negro|blanco|morado|naranja|rosa|gris|marrón|violeta|celeste|turquesa/i.test(message);
+      const preguntandoPelicula = /película|pelicula|favorita|preferida|capitan|avengers|marvel|dc|star wars|harry potter|señor de los anillos|batman|superman/i.test(message);
+      const preguntandoNombre = /nombre|llamo|como te llamas|quien eres|soy/i.test(message);
+      const preguntandoGenero = /música|genero|banda|canción|artista|favorito|preferido/i.test(message);
+      
+      let infoRecordada = '';
+      
+      // Buscar información SOLO si el usuario pregunta
+      if (preguntandoColor) {
+        const colores = ['amarillo', 'azul', 'rojo', 'verde', 'negro', 'blanco', 'morado', 
+                         'naranja', 'rosa', 'gris', 'marrón', 'violeta', 'celeste', 'turquesa'];
+        for (const color of colores) {
+          if (textoCompleto.toLowerCase().includes(color)) {
+            infoRecordada += `- Color favorito: ${color}\n`;
+            break;
+          }
         }
       }
       
-      // Buscar nombres
-      const nombresMatch = textoCompleto.match(/mi nombre es ([A-Za-záéíóúñÁÉÍÓÚÑ]+)/i) || 
-                            textoCompleto.match(/me llamo ([A-Za-záéíóúñÁÉÍÓÚÑ]+)/i) ||
-                            textoCompleto.match(/soy ([A-Za-záéíóúñÁÉÍÓÚÑ]+)/i);
-      if (nombresMatch) {
-        contextoCompleto += `\n- Nombre: ${nombresMatch[1]}`;
+      if (preguntandoPelicula) {
+        const peliculas = ['capitan america', 'capitán américa', 'avengers', 'iron man', 'spiderman', 
+                         'thor', 'hulk', 'black panther', 'star wars', 'harry potter', 'el señor de los anillos',
+                         'batman', 'superman', 'deadpool', 'wolverine', 'la liga de la justicia'];
+        for (const pelicula of peliculas) {
+          if (textoCompleto.toLowerCase().includes(pelicula)) {
+            infoRecordada += `- Película favorita: ${pelicula}\n`;
+            break;
+          }
+        }
       }
       
-      // Buscar intereses
-      const intereses = ['mitología', 'vikingos', 'historia', 'música', 'cine', 'deporte', 'lectura', 'viajes', 'fotografía', 'arte', 'tecnología', 'inteligencia artificial', 'programación'];
-      const interesesEncontrados = intereses.filter(i => textoCompleto.toLowerCase().includes(i));
-      if (interesesEncontrados.length > 0) {
-        contextoCompleto += `\n- Intereses: ${interesesEncontrados.join(', ')}`;
+      if (preguntandoNombre) {
+        const nombreMatch = textoCompleto.match(/mi nombre es ([A-Za-záéíóúñÁÉÍÓÚÑ\s]+)/i) || 
+                            textoCompleto.match(/me llamo ([A-Za-záéíóúñÁÉÍÓÚÑ\s]+)/i) ||
+                            textoCompleto.match(/soy ([A-Za-záéíóúñÁÉÍÓÚÑ\s]+)/i);
+        if (nombreMatch) {
+          infoRecordada += `- Nombre: ${nombreMatch[1].trim()}\n`;
+        }
       }
       
-      contextoCompleto += `\n\n📌 **INSTRUCCIONES IMPORTANTES:**`;
-      contextoCompleto += `\n1. SI el usuario pregunta algo que ya está en el historial, RESPONDE con esa información directamente.`;
-      contextoCompleto += `\n2. NO digas "no tengo información" si ya está en el historial.`;
-      // contextoCompleto += `\n3. SI el usuario pregunta "¿Cuál es mi color favorito?" y el historial dice "amarillo", RESPONDE "Tu color favorito es el amarillo".`;
-      contextoCompleto += `\n4. Siempre prioriza la información del historial sobre cualquier otra cosa.`;
+      if (preguntandoGenero) {
+        const generos = ['rock', 'pop', 'metal', 'clasica', 'jazz', 'blues', 'electronica', 'reggae', 
+                         'hip hop', 'rap', 'indie', 'alternativo', 'punk', 'folk', 'country'];
+        for (const genero of generos) {
+          if (textoCompleto.toLowerCase().includes(genero)) {
+            infoRecordada += `- Género musical: ${genero}\n`;
+            break;
+          }
+        }
+      }
       
-      systemPrompt += contextoCompleto;
+      // SOLO añadir al prompt si hay información relevante y el usuario preguntó
+      if (infoRecordada) {
+        systemPrompt += `\n\n📌 **INFORMACIÓN RECORDADA (relevante para la pregunta):**\n${infoRecordada}`;
+        systemPrompt += `\n⚠️ **INSTRUCCIÓN:** Usa esta información SOLO si el usuario preguntó por ella. Sé natural, no la repitas innecesariamente.`;
+      }
+      
+      // Añadir historial resumido (solo últimos 5 mensajes, truncados)
+      let historialResumido = '\n\n📜 **CONTEXTO RECIENTE:**\n';
+      const ultimosMensajes = historial.slice(-5);
+      for (const msg of ultimosMensajes) {
+        const rol = msg.role === 'user' ? 'Usuario' : 'JARVIS';
+        const contenido = msg.content.length > 120 ? msg.content.substring(0, 120) + '...' : msg.content;
+        historialResumido += `${rol}: ${contenido}\n`;
+      }
+      
+      systemPrompt += historialResumido;
+      systemPrompt += `\n⚠️ **INSTRUCCIÓN FINAL:** El historial es para contexto. NO repitas información ya confirmada. Sé conciso y natural, como un mayordomo británico competente.`;
+      
     } else if (contextoAnterior && contextoAnterior.lastTopic) {
-      // Fallback: si no hay historial pero hay contexto
+      // Fallback: si no hay historial pero hay contexto guardado
       systemPrompt += `\n\n⚠️ CONTEXTO DE CONVERSACIÓN ANTERIOR:
-      El usuario ya dijo: "${contextoAnterior.lastTopic}"
+      El usuario mencionó: "${contextoAnterior.lastTopic}"
       Tu respuesta fue: "${contextoAnterior.lastResponse}"
       
       📌 INSTRUCCIÓN: Esta es una CONTINUACIÓN. Responde considerando la conversación anterior.
       El usuario ahora dice: "${message}"`;
     }
 
+    // ─── OBTENER RESPUESTA DE LA IA ──────────────────────
     const { text, provider, fallback } = await getAIResponse(message, systemPrompt);
 
     // 🔥 GUARDAR RESPUESTA DEL AGENTE
     await memoryService.saveMessage(sessionId, 'assistant', text);
 
+    // 🔥 GUARDAR CONTEXTO ACTUALIZADO
     try {
       await memoryService.saveContext(sessionId, {
         lastTopic: message,
@@ -183,6 +217,7 @@ socket.on('user-message', async (message, options = {}) => {
       });
     } catch (error) {}
 
+    // ─── ENVIAR RESPUESTA AL FRONTEND ─────────────────────
     const actionData = tryParseAction(text);
 
     if (actionData) {
