@@ -1,10 +1,27 @@
 // frontend/js/app-simple.js
-// 🎯 ESFERA 3D LIMPIA - REACCIONA AL MICRÓFONO
+// 🎯 CON SESIÓN PERSISTENTE - RECUERDA LA CONVERSACIÓN
 
 (function() {
   'use strict';
 
   console.log('🚀 app-simple.js cargado');
+
+  // ============================================================
+  // CONFIGURACIÓN DE SESIÓN PERSISTENTE
+  // ============================================================
+  function initSession() {
+    let sessionId = localStorage.getItem('jarvis_session_id');
+    if (!sessionId) {
+      sessionId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('jarvis_session_id', sessionId);
+      console.log('[JARVIS] 🆔 Nueva sesión creada:', sessionId);
+    } else {
+      console.log('[JARVIS] 🆔 Sesión restaurada:', sessionId);
+    }
+    return sessionId;
+  }
+
+  const SESSION_ID = initSession();
 
   // ============================================================
   // VARIABLES GLOBALES
@@ -87,7 +104,7 @@
     scene.add(innerSphere);
 
     // ============================================================
-    // ANILLO DECORATIVO (opcional, para darle estilo)
+    // ANILLO DECORATIVO
     // ============================================================
     const ringGeom = new THREE.TorusGeometry(1.6, 0.015, 16, 100);
     const ringMat = new THREE.MeshBasicMaterial({
@@ -186,10 +203,7 @@
         const average = sum / dataArray.length;
 
         if (average > 5) {
-          // ESCALA: la esfera crece
           targetScale = 1.0 + (average / 255) * 0.5;
-          
-          // COLOR: cambia de azul a rojo según el volumen
           const hue = 0.6 - (average / 255) * 0.5;
           if (sphereMaterial) {
             sphereMaterial.color.setHSL(Math.max(0, Math.min(1, hue)), 1, 0.5);
@@ -291,7 +305,8 @@
     displayMessage(text, 'user');
     
     if (socket) {
-      socket.emit('user-message', text);
+      // 🔥 ENVIAR EL SESSION ID PERSISTENTE
+      socket.emit('user-message', text, { sessionId: SESSION_ID });
     }
     
     input.value = '';
@@ -385,195 +400,172 @@
   // ============================================================
   // DRIVE CONVERTER
   // ============================================================
-  // frontend/js/app-simple.js - Reemplazar la función setupDriveConverter
+  function setupDriveConverter() {
+    const toggleBtn = document.getElementById('drive-toggle-btn');
+    const section = document.getElementById('drive-converter-section');
+    const closeBtn = document.getElementById('close-drive-section');
+    const convertBtn = document.getElementById('convert-drive-btn');
+    const addRespuestaBtn = document.getElementById('add-respuesta-btn');
+    const respuestasContainer = document.getElementById('respuestas-container');
 
-function setupDriveConverter() {
-  const toggleBtn = document.getElementById('drive-toggle-btn');
-  const section = document.getElementById('drive-converter-section');
-  const closeBtn = document.getElementById('close-drive-section');
-  const convertBtn = document.getElementById('convert-drive-btn');
-  const addRespuestaBtn = document.getElementById('add-respuesta-btn');
-  const respuestasContainer = document.getElementById('respuestas-container');
+    let convertedUrl = '';
 
-  // Variables para almacenar la URL convertida
-  let convertedUrl = '';
-
-  // --- ABRIR/CERRAR MODAL ---
-  if (toggleBtn && section) {
-    toggleBtn.addEventListener('click', function() {
-      section.style.display = section.style.display === 'block' ? 'none' : 'block';
-      if (section.style.display === 'block') {
-        // Pre-fill fecha con la actual
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('post-fecha').value = `${year}-${month}-${day}T${hours}:${minutes}`;
-      }
-    });
-  }
-
-  if (closeBtn && section) {
-    closeBtn.addEventListener('click', function() {
-      section.style.display = 'none';
-    });
-  }
-
-  // --- AÑADIR CAMPO DE RESPUESTA ---
-  if (addRespuestaBtn && respuestasContainer) {
-    addRespuestaBtn.addEventListener('click', function() {
-      const div = document.createElement('div');
-      div.style.cssText = 'display:grid; grid-template-columns: 1fr 2fr auto; gap:6px; margin-bottom:6px; align-items:center;';
-      div.innerHTML = `
-        <input type="text" placeholder="Palabra clave" class="respuesta-clave" style="padding:6px 8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#fff; font-size:0.75rem;">
-        <input type="text" placeholder="Respuesta..." class="respuesta-valor" style="padding:6px 8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#fff; font-size:0.75rem;">
-        <button class="eliminar-respuesta" style="background:rgba(255,60,60,0.2); border:none; border-radius:4px; color:#ff6b6b; cursor:pointer; padding:4px 8px; font-size:0.7rem;">✕</button>
-      `;
-      const eliminarBtn = div.querySelector('.eliminar-respuesta');
-      eliminarBtn.addEventListener('click', function() {
-        div.remove();
+    if (toggleBtn && section) {
+      toggleBtn.addEventListener('click', function() {
+        section.style.display = section.style.display === 'block' ? 'none' : 'block';
+        if (section.style.display === 'block') {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          document.getElementById('post-fecha').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
       });
-      respuestasContainer.appendChild(div);
-    });
-  }
+    }
 
-  // --- CONVERTIR Y CREAR ---
-  if (convertBtn) {
-    convertBtn.addEventListener('click', function() {
-      const urlInput = document.getElementById('drive-url');
-      const url = urlInput.value.trim();
-      
-      // 1. Validar y convertir URL
-      const match = url.match(/file\/d\/([^/?#]+)/);
-      if (!match) {
-        alert('❌ URL de Google Drive inválida. Asegúrate de copiar la URL completa.');
-        return;
-      }
-      const fileId = match[1];
-      convertedUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
-      console.log('[Drive] URL convertida:', convertedUrl);
+    if (closeBtn && section) {
+      closeBtn.addEventListener('click', function() {
+        section.style.display = 'none';
+      });
+    }
 
-      // 2. Recolectar datos del formulario
-      const titulo = document.getElementById('post-titulo').value.trim();
-      const fecha = document.getElementById('post-fecha').value;
-      const hashtagsInput = document.getElementById('post-hashtags').value.trim();
-      const descripcion = document.getElementById('post-descripcion').value.trim();
-      const cta = document.getElementById('post-cta').value.trim();
-      const cover = document.getElementById('post-cover').value.trim();
+    if (addRespuestaBtn && respuestasContainer) {
+      addRespuestaBtn.addEventListener('click', function() {
+        const div = document.createElement('div');
+        div.style.cssText = 'display:grid; grid-template-columns: 1fr 2fr auto; gap:6px; margin-bottom:6px; align-items:center;';
+        div.innerHTML = `
+          <input type="text" placeholder="Palabra clave" class="respuesta-clave" style="padding:6px 8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#fff; font-size:0.75rem;">
+          <input type="text" placeholder="Respuesta..." class="respuesta-valor" style="padding:6px 8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#fff; font-size:0.75rem;">
+          <button class="eliminar-respuesta" style="background:rgba(255,60,60,0.2); border:none; border-radius:4px; color:#ff6b6b; cursor:pointer; padding:4px 8px; font-size:0.7rem;">✕</button>
+        `;
+        const eliminarBtn = div.querySelector('.eliminar-respuesta');
+        eliminarBtn.addEventListener('click', function() {
+          div.remove();
+        });
+        respuestasContainer.appendChild(div);
+      });
+    }
 
-      if (!titulo) {
-        alert('⚠️ El campo "Título" es obligatorio.');
-        return;
-      }
-      if (!fecha) {
-        alert('⚠️ La "Fecha de Publicación" es obligatoria.');
-        return;
-      }
+    if (convertBtn) {
+      convertBtn.addEventListener('click', function() {
+        const urlInput = document.getElementById('drive-url');
+        const url = urlInput.value.trim();
+        
+        const match = url.match(/file\/d\/([^/?#]+)/);
+        if (!match) {
+          alert('❌ URL de Google Drive inválida. Asegúrate de copiar la URL completa.');
+          return;
+        }
+        const fileId = match[1];
+        convertedUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
+        console.log('[Drive] URL convertida:', convertedUrl);
 
-      // Parsear hashtags
-      const hashtags = hashtagsInput ? hashtagsInput.split(',').map(h => h.trim()).filter(h => h.startsWith('#')) : [];
+        const titulo = document.getElementById('post-titulo').value.trim();
+        const fecha = document.getElementById('post-fecha').value;
+        const hashtagsInput = document.getElementById('post-hashtags').value.trim();
+        const descripcion = document.getElementById('post-descripcion').value.trim();
+        const cta = document.getElementById('post-cta').value.trim();
+        const cover = document.getElementById('post-cover').value.trim();
 
-      // 3. Recolectar respuestas personalizadas
-      const respuestas = {};
-      const claves = document.querySelectorAll('.respuesta-clave');
-      const valores = document.querySelectorAll('.respuesta-valor');
-      
-      if (claves.length > 0 && claves.length === valores.length) {
-        for (let i = 0; i < claves.length; i++) {
-          const clave = claves[i].value.trim().toLowerCase();
-          const valor = valores[i].value.trim();
-          if (clave && valor) {
-            respuestas[clave] = valor;
+        if (!titulo) {
+          alert('⚠️ El campo "Título" es obligatorio.');
+          return;
+        }
+        if (!fecha) {
+          alert('⚠️ La "Fecha de Publicación" es obligatoria.');
+          return;
+        }
+
+        const hashtags = hashtagsInput ? hashtagsInput.split(',').map(h => h.trim()).filter(h => h.startsWith('#')) : [];
+
+        const respuestas = {};
+        const claves = document.querySelectorAll('.respuesta-clave');
+        const valores = document.querySelectorAll('.respuesta-valor');
+        
+        if (claves.length > 0 && claves.length === valores.length) {
+          for (let i = 0; i < claves.length; i++) {
+            const clave = claves[i].value.trim().toLowerCase();
+            const valor = valores[i].value.trim();
+            if (clave && valor) {
+              respuestas[clave] = valor;
+            }
           }
         }
-      }
-      
-      // Añadir respuesta "default" si no existe
-      if (!respuestas['default']) {
-        // Podrías preguntar o establecer un valor por defecto aquí
-        // respuestas['default'] = 'Respuesta por defecto...';
-        // console.log('[Drive] Usando respuesta default.');
-      }
 
-      // 4. Construir payload final
-      const data = {
-        titulo: titulo,
-        fecha_publicacion: fecha.replace('T', ' '), // Convertir a formato que espera el backend
-        video_url: convertedUrl,
-        hashtags: hashtags.length > 0 ? hashtags : ['#vikingos', '#valhalla', '#reinoDeValhalla'],
-        descripcion: descripcion || titulo,
-        llamada_accion: cta || '⚔️ ¡Síguenos para más historias!',
-        cover_url: cover || null,
-        palabras_clave: Object.keys(respuestas),
-        respuestas: respuestas
-      };
+        const data = {
+          titulo: titulo,
+          fecha_publicacion: fecha.replace('T', ' '),
+          video_url: convertedUrl,
+          hashtags: hashtags.length > 0 ? hashtags : ['#vikingos', '#valhalla', '#reinoDeValhalla'],
+          descripcion: descripcion || titulo,
+          llamada_accion: cta || '⚔️ ¡Síguenos para más historias!',
+          cover_url: cover || null,
+          palabras_clave: Object.keys(respuestas),
+          respuestas: respuestas
+        };
 
-      console.log('[Drive] Datos a enviar:', data);
+        console.log('[Drive] Datos a enviar:', data);
 
-      // 5. Enviar al backend
-      const statusDiv = document.getElementById('drive-status') || createStatusDiv(section);
-      statusDiv.innerHTML = '⏳ Creando publicación...';
-      statusDiv.style.color = '#ffb800';
+        const statusDiv = document.getElementById('drive-status') || createStatusDiv(section);
+        statusDiv.innerHTML = '⏳ Creando publicación...';
+        statusDiv.style.color = '#ffb800';
 
-      fetch('/api/create-post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(res => res.json())
-      .then(result => {
-        if (result.success) {
-          statusDiv.innerHTML = '✅ ¡Publicación creada en Obsidian!';
-          statusDiv.style.color = '#00c853';
-          // Resetear formulario
-          urlInput.value = '';
-          document.getElementById('post-titulo').value = '';
-          document.getElementById('post-hashtags').value = '';
-          document.getElementById('post-descripcion').value = '';
-          document.getElementById('post-cta').value = '';
-          document.getElementById('post-cover').value = '';
-          respuestasContainer.innerHTML = ''; // Limpiar respuestas
-          
-          // Preguntar si quiere publicar ahora
-          if (confirm('✅ Publicación creada. ¿Quieres publicarla ahora en Instagram?')) {
-            statusDiv.innerHTML = '🚀 Publicando en Instagram...';
-            statusDiv.style.color = '#ffb800';
-            fetch('/api/publish-all-pending', { method: 'POST' })
-              .then(res => res.json())
-              .then(publishResult => {
-                if (publishResult.success && publishResult.total > 0) {
-                  statusDiv.innerHTML = `✅ ¡Publicación enviada a Instagram! (${publishResult.procesados} publicados)`;
-                  statusDiv.style.color = '#00c853';
-                } else {
-                  statusDiv.innerHTML = '⚠️ No se publicó nada. Revisa los archivos programados.';
-                  statusDiv.style.color = '#ffb800';
-                }
-              })
-              .catch(err => {
-                statusDiv.innerHTML = `❌ Error publicando: ${err.message}`;
-                statusDiv.style.color = '#ff6b6b';
-              });
+        fetch('/api/create-post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            statusDiv.innerHTML = '✅ ¡Publicación creada en Obsidian!';
+            statusDiv.style.color = '#00c853';
+            urlInput.value = '';
+            document.getElementById('post-titulo').value = '';
+            document.getElementById('post-hashtags').value = '';
+            document.getElementById('post-descripcion').value = '';
+            document.getElementById('post-cta').value = '';
+            document.getElementById('post-cover').value = '';
+            respuestasContainer.innerHTML = '';
+            
+            if (confirm('✅ Publicación creada. ¿Quieres publicarla ahora en Instagram?')) {
+              statusDiv.innerHTML = '🚀 Publicando en Instagram...';
+              statusDiv.style.color = '#ffb800';
+              fetch('/api/publish-all-pending', { method: 'POST' })
+                .then(res => res.json())
+                .then(publishResult => {
+                  if (publishResult.success && publishResult.total > 0) {
+                    statusDiv.innerHTML = `✅ ¡Publicación enviada a Instagram! (${publishResult.procesados} publicados)`;
+                    statusDiv.style.color = '#00c853';
+                  } else {
+                    statusDiv.innerHTML = '⚠️ No se publicó nada. Revisa los archivos programados.';
+                    statusDiv.style.color = '#ffb800';
+                  }
+                })
+                .catch(err => {
+                  statusDiv.innerHTML = `❌ Error publicando: ${err.message}`;
+                  statusDiv.style.color = '#ff6b6b';
+                });
+            } else {
+              setTimeout(() => {
+                if (section) section.style.display = 'none';
+              }, 2000);
+            }
           } else {
-            // Cerrar modal después de un tiempo
-            setTimeout(() => {
-              if (section) section.style.display = 'none';
-            }, 2000);
+            statusDiv.innerHTML = `❌ Error: ${result.error || 'Error desconocido'}`;
+            statusDiv.style.color = '#ff6b6b';
           }
-        } else {
-          statusDiv.innerHTML = `❌ Error: ${result.error || 'Error desconocido'}`;
+        })
+        .catch(err => {
+          statusDiv.innerHTML = `❌ Error de red: ${err.message}`;
           statusDiv.style.color = '#ff6b6b';
-        }
-      })
-      .catch(err => {
-        statusDiv.innerHTML = `❌ Error de red: ${err.message}`;
-        statusDiv.style.color = '#ff6b6b';
+        });
       });
-    });
+    }
   }
 
-  // Función auxiliar para crear el div de estado si no existe
   function createStatusDiv(parent) {
     let statusDiv = document.getElementById('drive-status');
     if (!statusDiv) {
@@ -584,13 +576,13 @@ function setupDriveConverter() {
     }
     return statusDiv;
   }
-}
 
   // ============================================================
   // INICIALIZACIÓN
   // ============================================================
   function init() {
     console.log('🚀 Iniciando JARVIS...');
+    console.log('🆔 Session ID persistente:', SESSION_ID);
     
     // Visualizador 3D
     initVisualizer();
@@ -623,7 +615,8 @@ function setupDriveConverter() {
       displayMessage(
         '⚡ **JARVIS activo**\n\n' +
         'Comandos: /help\n' +
-        'Agente: JARVIS (🧠 Planificador)',
+        'Agente: JARVIS (🧠 Planificador)\n\n' +
+        '💡 **Tu sesión es persistente:** Puedes refrescar la página y recordaré nuestra conversación.',
         'system'
       );
     }, 500);
