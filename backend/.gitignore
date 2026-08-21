@@ -1,1 +1,7 @@
 proyecto.txt
+../proyecto.txt
+backend/proyecto.txt
+*.log
+.env
+node_modules/
+dist/
