@@ -1,0 +1,3014 @@
+============================================================
+📋 COGNITIVE MEMORY SYSTEM - FULL CODE DUMP
+============================================================
+FECHA: $(date)
+PROYECTO: JARVIS - Fase 4.1
+
+CONTENIDO:
+1. cognitiveMemoryService.js
+2. memoryStore.js  
+3. memoryRetriever.js
+4. factExtractor.js
+5. memorySummarizer.js
+6. memoryTypes.js
+7. memoryRoutes.js (si existe)
+8. Socket.io integration (chat handler)
+9. ReasoningService integration
+10. Tests de aislamiento
+
+============================================================
+
+============================================================
+📄 ARCHIVO: backend/src/memory/cognitiveMemoryService.js
+============================================================
+// backend/src/memory/cognitiveMemoryService.js
+// 🧠 SERVICIO DE MEMORIA COGNITIVA - VERSIÓN ESTRUCTURADA
+
+import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../core/logger.js';
+import { 
+  MEMORY_TYPES, 
+  MEMORY_IMPORTANCE, 
+  MEMORY_STATUS,
+  MEMORY_SOURCES,
+  MEMORY_STRUCTURE
+} from './memoryTypes.js';
+import MemoryStore from './memoryStore.js';
+import FactExtractor from './factExtractor.js';
+import MemoryRetriever from './memoryRetriever.js';
+import MemorySummarizer from './memorySummarizer.js';
+
+class CognitiveMemoryService {
+  constructor(config = {}) {
+    this.config = {
+      dbPath: config.dbPath || './data/memory.db',
+      maxMemoriesPerQuery: config.maxMemoriesPerQuery || 10,
+      minImportance: config.minImportance || 2,
+      enableSummaries: config.enableSummaries !== false,
+      ...config
+    };
+
+    this.store = new MemoryStore(this.config.dbPath);
+    this.extractor = new FactExtractor();
+    this.retriever = new MemoryRetriever(this.store);
+    this.summarizer = new MemorySummarizer(this.config);
+    
+    this.initialized = false;
+    this.status = 'initializing';
+    this.metrics = {
+      memoriesCount: 0,
+      factsExtracted: 0,
+      queriesProcessed: 0
+    };
+  }
+
+  async initialize() {
+    if (this.initialized) return;
+
+    try {
+      logger.info('[CognitiveMemoryService] Inicializando...');
+      
+      await this.store.init();
+      this.initialized = true;
+      this.status = 'online';
+      
+      this.metrics.memoriesCount = await this.store.count();
+      
+      logger.info('[CognitiveMemoryService] Inicializado', {
+        dbPath: this.config.dbPath,
+        memoriesCount: this.metrics.memoriesCount
+      });
+      
+      return true;
+    } catch (error) {
+      this.status = 'error';
+      logger.error('[CognitiveMemoryService] Error inicializando', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  // ──────── MÉTODOS PRINCIPALES ────────
+
+  /**
+   * Guardar un hecho o información en memoria
+   * 🆕 AHORA SOPORTA CLAVE/VALOR ESTRUCTURADO
+   */
+  async remember(content, options = {}) {
+    await this.ensureInitialized();
+
+    // 🆕 Si es un objeto con key/value, guardar estructurado
+    let memoryContent = content;
+    let memoryType = options.type || MEMORY_TYPES.FACT;
+    let tags = options.tags || [];
+    let metadata = options.metadata || {};
+
+    if (typeof content === 'object' && content.key && content.value !== undefined) {
+      // Memoria estructurada clave/valor
+      memoryContent = `${content.key}: ${content.value}`;
+      memoryType = content.key;
+      tags = [...tags, 'structured', content.key];
+      metadata = {
+        ...metadata,
+        key: content.key,
+        value: content.value,
+        structure: MEMORY_STRUCTURE.KEY_VALUE
+      };
+    }
+
+    const memory = {
+      id: this.generateId(),
+      type: memoryType,
+      content: memoryContent,
+      source: options.source || MEMORY_SOURCES.USER,
+      importance: options.importance || this._getImportanceForType(memoryType),
+      confidence: options.confidence || 1.0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      tags: tags,
+      sessionId: options.sessionId || 'default',
+      metadata: metadata,
+      status: MEMORY_STATUS.ACTIVE
+    };
+
+    // 🆕 Si es una memoria estructurada, guardar también el key/value en metadata
+    if (metadata.key && metadata.value) {
+      memory.metadata = {
+        ...memory.metadata,
+        key: metadata.key,
+        value: metadata.value
+      };
+    }
+
+    await this.store.save(memory);
+    this.metrics.memoriesCount++;
+    
+    logger.debug('[CognitiveMemoryService] Memoria guardada', {
+      id: memory.id,
+      type: memory.type,
+      key: metadata.key || 'none',
+      sessionId: memory.sessionId
+    });
+
+    return memory;
+  }
+
+  /**
+   * Recordar información relevante para una consulta
+   * 🆕 AHORA PUEDE RECUPERAR POR CLAVE ESPECÍFICA
+   */
+  async recall(query, options = {}) {
+    await this.ensureInitialized();
+
+    this.metrics.queriesProcessed++;
+
+    try {
+      // 🆕 Si la consulta pide una clave específica, buscar por tipo
+      const keyMatch = this._extractKeyFromQuery(query);
+      
+      let memories;
+      if (keyMatch && options.lookupKey) {
+        // Buscar por tipo exacto
+        memories = await this.store.list({
+          type: keyMatch,
+          sessionId: options.sessionId,
+          limit: this.config.maxMemoriesPerQuery * 2,
+          status: MEMORY_STATUS.ACTIVE
+        });
+      } else {
+        // Búsqueda normal por texto
+        memories = await this.retriever.search(query, {
+          sessionId: options.sessionId,
+          limit: this.config.maxMemoriesPerQuery * 2
+        });
+      }
+
+      // Filtrar por importancia
+      const minImportance = options.minImportance || this.config.minImportance;
+      memories = memories.filter(m => m.importance >= minImportance);
+
+      // Ordenar por relevancia
+      memories = this.retriever.rankByRelevance(memories, query);
+
+      // Limitar resultados
+      const limit = options.limit || this.config.maxMemoriesPerQuery;
+      memories = memories.slice(0, limit);
+
+      // Actualizar lastAccessedAt
+      for (const memory of memories) {
+        await this.store.update(memory.id, {
+          lastAccessedAt: new Date().toISOString()
+        });
+      }
+
+      return memories;
+    } catch (error) {
+      logger.error('[CognitiveMemoryService] Error en recall', {
+        error: error.message,
+        query
+      });
+      return [];
+    }
+  }
+
+  /**
+   * 🆕 RECUPERAR POR CLAVE ESPECÍFICA
+   */
+  async recallByKey(key, sessionId) {
+    await this.ensureInitialized();
+
+    try {
+      const memories = await this.store.list({
+        type: key,
+        sessionId: sessionId,
+        limit: 1,
+        status: MEMORY_STATUS.ACTIVE
+      });
+
+      if (memories.length > 0) {
+        const memory = memories[0];
+        // Si tiene metadata con value, devolverlo
+        if (memory.metadata && memory.metadata.value) {
+          return {
+            exists: true,
+            key: key,
+            value: memory.metadata.value,
+            memory: memory
+          };
+        }
+        return {
+          exists: true,
+          key: key,
+          value: memory.content,
+          memory: memory
+        };
+      }
+
+      return { exists: false, key: key, value: null };
+    } catch (error) {
+      logger.error('[CognitiveMemoryService] Error en recallByKey', {
+        error: error.message,
+        key,
+        sessionId
+      });
+      return { exists: false, key: key, value: null };
+    }
+  }
+
+  /**
+   * Extraer y guardar hechos automáticamente
+   * 🆕 AHORA GUARDA ESTRUCTURADO
+   */
+  async extractAndRemember(text, options = {}) {
+    await this.ensureInitialized();
+
+    const facts = this.extractor.extract(text);
+    const savedFacts = [];
+
+    for (const fact of facts) {
+      try {
+        // 🆕 Guardar como estructura clave/valor
+        const memory = await this.remember(
+          {
+            key: fact.key,
+            value: fact.value
+          },
+          {
+            type: fact.type,
+            source: MEMORY_SOURCES.EXTRACTED,
+            importance: fact.importance || MEMORY_IMPORTANCE.MEDIUM,
+            confidence: fact.confidence || 0.7,
+            sessionId: options.sessionId,
+            tags: [fact.type, 'extracted', ...(options.tags || [])],
+            metadata: {
+              originalText: fact.original,
+              extractedType: fact.type
+            }
+          }
+        );
+        savedFacts.push(memory);
+        this.metrics.factsExtracted++;
+      } catch (error) {
+        logger.warn('[CognitiveMemoryService] Error guardando hecho extraído', {
+          error: error.message,
+          fact: fact.value
+        });
+      }
+    }
+
+    return savedFacts;
+  }
+
+  /**
+   * Extraer hechos de un texto (sin guardar)
+   */
+  extractFacts(text) {
+    return this.extractor.extract(text);
+  }
+
+  /**
+   * 🆕 Extraer un tipo específico
+   */
+  extractType(text, type) {
+    return this.extractor.extractType(text, type);
+  }
+
+  /**
+   * Olvidar información (marcar como deprecado)
+   */
+  async forget(id) {
+    await this.ensureInitialized();
+    await this.store.update(id, {
+      status: MEMORY_STATUS.DEPRECATED,
+      updatedAt: new Date().toISOString()
+    });
+    this.metrics.memoriesCount--;
+  }
+
+  /**
+   * Generar resumen de una conversación
+   */
+  async summarizeConversation(sessionId) {
+    await this.ensureInitialized();
+
+    try {
+      const memories = await this.store.list({
+        sessionId,
+        limit: 100,
+        status: MEMORY_STATUS.ACTIVE
+      });
+      
+      return this.summarizer.summarizeConversation(memories);
+    } catch (error) {
+      logger.error('[CognitiveMemoryService] Error generando resumen', {
+        error: error.message,
+        sessionId
+      });
+      return 'No se pudo generar el resumen.';
+    }
+  }
+
+  /**
+   * Obtener todas las memorias de un tipo
+   */
+  async getByType(type, sessionId, limit = 20) {
+    await this.ensureInitialized();
+    return this.retriever.getByType(type, sessionId, limit);
+  }
+
+  /**
+   * Obtener últimas memorias
+   */
+  async getLatest(sessionId, limit = 10) {
+    await this.ensureInitialized();
+    return this.retriever.getLatest(sessionId, limit);
+  }
+
+  /**
+   * Obtener contexto para una conversación
+   */
+  async getContext(sessionId, limit = 10) {
+    await this.ensureInitialized();
+
+    try {
+      const memories = await this.store.list({
+        sessionId,
+        limit,
+        status: MEMORY_STATUS.ACTIVE
+      });
+      
+      const context = this.summarizer.summarizeContext(memories);
+      return { memories, context };
+    } catch (error) {
+      logger.error('[CognitiveMemoryService] Error obteniendo contexto', {
+        error: error.message,
+        sessionId
+      });
+      return { memories: [], context: 'No hay contexto disponible.' };
+    }
+  }
+
+  // ──────── UTILIDADES ────────
+
+  // 🆕 OBTENER IMPORTANCIA POR TIPO
+  _getImportanceForType(type) {
+    const map = {
+      user_name: MEMORY_IMPORTANCE.USER_NAME,
+      favorite_color: MEMORY_IMPORTANCE.FAVORITE_COLOR,
+      project_name: MEMORY_IMPORTANCE.PROJECT_NAME,
+      tech_stack: MEMORY_IMPORTANCE.TECH_STACK,
+      favorite_food: MEMORY_IMPORTANCE.HIGH,
+      favorite_music: MEMORY_IMPORTANCE.HIGH,
+      occupation: MEMORY_IMPORTANCE.HIGH,
+      location: MEMORY_IMPORTANCE.MEDIUM,
+      birthday: MEMORY_IMPORTANCE.HIGH
+    };
+    return map[type] || MEMORY_IMPORTANCE.MEDIUM;
+  }
+
+  // 🆕 EXTRAER CLAVE DE UNA PREGUNTA
+  _extractKeyFromQuery(query) {
+    const patterns = {
+      user_name: /(?:nombre|llamo|llam|soy|quien|quién)\s*(?:es|soy|me llamo)?\s*(?:mi)?\s*(?:nombre)?/i,
+      favorite_color: /(?:color favorito|color preferido|color que te gusta|color)/i,
+      project_name: /(?:proyecto|sistema|app|aplicación)\s*(?:se llama|llama|nombre)?/i,
+      tech_stack: /(?:tecnología|stack|herramientas|framework|lenguaje)\s*(?:usamos|utilizamos|usas|utilizas)?/i,
+      favorite_food: /(?:comida favorita|platillo favorito|comida que te gusta)/i,
+      favorite_music: /(?:música favorita|genero favorito|banda favorita|artista favorito)/i,
+      occupation: /(?:trabajo|ocupación|profesión|oficio|haces|dedicas)/i,
+      location: /(?:vives|ubicación|ciudad|lugar|donde|dónde)\s*(?:vives|estás|resides)?/i
+    };
+
+    for (const [key, pattern] of Object.entries(patterns)) {
+      if (pattern.test(query)) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  generateId() {
+    return `mem_${Date.now()}_${uuidv4().substring(0, 8)}`;
+  }
+
+  async ensureInitialized() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  async cleanup() {
+    try {
+      logger.info('[CognitiveMemoryService] Cleanup ejecutado');
+    } catch (error) {
+      logger.error('[CognitiveMemoryService] Error en cleanup', {
+        error: error.message
+      });
+    }
+  }
+
+  async close() {
+    await this.store.close();
+    this.initialized = false;
+    this.status = 'offline';
+    logger.info('[CognitiveMemoryService] Cerrado');
+  }
+
+  // ──────── MÉTRICAS ────────
+
+  getMetrics() {
+    return {
+      initialized: this.initialized,
+      status: this.status,
+      memoriesCount: this.metrics.memoriesCount,
+      factsExtracted: this.metrics.factsExtracted,
+      queriesProcessed: this.metrics.queriesProcessed,
+      config: {
+        maxMemoriesPerQuery: this.config.maxMemoriesPerQuery,
+        minImportance: this.config.minImportance,
+        enableSummaries: this.config.enableSummaries
+      }
+    };
+  }
+
+  getStatus() {
+    return {
+      initialized: this.initialized,
+      status: this.status,
+      metrics: this.getMetrics()
+    };
+  }
+}
+
+export default CognitiveMemoryService;
+============================================================
+📄 ARCHIVO: backend/src/memory/memoryStore.js
+============================================================
+// backend/src/memory/memoryStore.js
+// 🗄️ ALMACENAMIENTO DE MEMORIA (SQLite)
+
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+import { logger } from '../core/logger.js';
+import { MEMORY_STATUS } from './memoryTypes.js';
+
+class MemoryStore {
+  constructor(dbPath = './data/memory.db') {
+    this.dbPath = dbPath;
+    this.db = null;
+    this.initialized = false;
+  }
+
+  async init() {
+    if (this.initialized) return;
+
+    try {
+      this.db = await open({
+        filename: this.dbPath,
+        driver: sqlite3.Database
+      });
+
+      await this.createTables();
+      this.initialized = true;
+      logger.info('[MemoryStore] Inicializado', { dbPath: this.dbPath });
+    } catch (error) {
+      logger.error('[MemoryStore] Error inicializando', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async createTables() {
+    await this.db.exec(`
+      CREATE TABLE IF NOT EXISTS memories (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        source TEXT NOT NULL,
+        importance INTEGER DEFAULT 3,
+        confidence REAL DEFAULT 1.0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_accessed_at TEXT NOT NULL,
+        tags TEXT,
+        session_id TEXT NOT NULL,
+        metadata TEXT,
+        status TEXT DEFAULT 'active'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
+      CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
+      CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
+      CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
+      CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance);
+    `);
+
+    // Crear tabla para embeddings (Fase 4.3)
+    await this.db.exec(`
+      CREATE TABLE IF NOT EXISTS memory_embeddings (
+        memory_id TEXT PRIMARY KEY,
+        embedding TEXT NOT NULL,
+        model TEXT DEFAULT 'default',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE
+      );
+    `);
+  }
+
+  async save(memory) {
+    if (!this.initialized) await this.init();
+
+    const now = new Date().toISOString();
+    
+    await this.db.run(`
+      INSERT OR REPLACE INTO memories (
+        id, type, content, source, importance, confidence,
+        created_at, updated_at, last_accessed_at, tags,
+        session_id, metadata, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      memory.id,
+      memory.type,
+      memory.content,
+      memory.source || 'system',
+      memory.importance || 3,
+      memory.confidence || 1.0,
+      memory.createdAt || now,
+      memory.updatedAt || now,
+      memory.lastAccessedAt || now,
+      JSON.stringify(memory.tags || []),
+      memory.sessionId || 'default',
+      JSON.stringify(memory.metadata || {}),
+      memory.status || 'active'
+    ]);
+
+    return memory;
+  }
+
+  async get(id) {
+    if (!this.initialized) await this.init();
+
+    const row = await this.db.get(
+      'SELECT * FROM memories WHERE id = ?',
+      [id]
+    );
+    return this.rowToMemory(row);
+  }
+
+  async search(query, options = {}) {
+    if (!this.initialized) await this.init();
+
+    const { limit = 20, type = null, sessionId = null } = options;
+    
+    let sql = `SELECT * FROM memories WHERE status = 'active'`;
+    const params = [];
+
+    if (query && query.trim()) {
+      sql += ` AND content LIKE ?`;
+      params.push(`%${query}%`);
+    }
+
+    if (type) {
+      sql += ` AND type = ?`;
+      params.push(type);
+    }
+
+    if (sessionId) {
+      sql += ` AND session_id = ?`;
+      params.push(sessionId);
+    }
+
+    sql += ` ORDER BY last_accessed_at DESC LIMIT ?`;
+    params.push(limit);
+
+    const rows = await this.db.all(sql, params);
+    return rows.map(this.rowToMemory);
+  }
+
+  async list(filters = {}) {
+    if (!this.initialized) await this.init();
+
+    const {
+      limit = 50,
+      offset = 0,
+      type = null,
+      sessionId = null,
+      status = 'active',
+      minImportance = 0
+    } = filters;
+
+    let sql = `SELECT * FROM memories WHERE 1=1`;
+    const params = [];
+
+    if (type) {
+      sql += ` AND type = ?`;
+      params.push(type);
+    }
+
+    if (sessionId) {
+      sql += ` AND session_id = ?`;
+      params.push(sessionId);
+    }
+
+    if (status) {
+      sql += ` AND status = ?`;
+      params.push(status);
+    }
+
+    if (minImportance > 0) {
+      sql += ` AND importance >= ?`;
+      params.push(minImportance);
+    }
+
+    sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const rows = await this.db.all(sql, params);
+    return rows.map(this.rowToMemory);
+  }
+
+  async update(id, data) {
+    if (!this.initialized) await this.init();
+
+    const now = new Date().toISOString();
+    const updates = [];
+    const params = [];
+
+    for (const [key, value] of Object.entries(data)) {
+      // Convertir key a snake_case para SQL
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      updates.push(`${dbKey} = ?`);
+      
+      if (key === 'tags' || key === 'metadata') {
+        params.push(JSON.stringify(value));
+      } else {
+        params.push(value);
+      }
+    }
+
+    updates.push('updated_at = ?');
+    params.push(now);
+
+    params.push(id);
+
+    await this.db.run(`
+      UPDATE memories SET ${updates.join(', ')} WHERE id = ?
+    `, params);
+
+    return this.get(id);
+  }
+
+  async delete(id, soft = true) {
+    if (!this.initialized) await this.init();
+
+    if (soft) {
+      await this.db.run(
+        `UPDATE memories SET status = 'deprecated', updated_at = ? WHERE id = ?`,
+        [new Date().toISOString(), id]
+      );
+    } else {
+      await this.db.run(`DELETE FROM memories WHERE id = ?`, [id]);
+    }
+
+    return true;
+  }
+
+  async count(filters = {}) {
+    if (!this.initialized) await this.init();
+
+    const { type = null, sessionId = null, status = 'active' } = filters;
+    
+    let sql = `SELECT COUNT(*) as count FROM memories WHERE 1=1`;
+    const params = [];
+
+    if (type) {
+      sql += ` AND type = ?`;
+      params.push(type);
+    }
+
+    if (sessionId) {
+      sql += ` AND session_id = ?`;
+      params.push(sessionId);
+    }
+
+    if (status) {
+      sql += ` AND status = ?`;
+      params.push(status);
+    }
+
+    const result = await this.db.get(sql, params);
+    return result ? result.count : 0;
+  }
+
+  async getBySession(sessionId, limit = 50) {
+    if (!this.initialized) await this.init();
+
+    const rows = await this.db.all(
+      `SELECT * FROM memories 
+       WHERE session_id = ? AND status = 'active'
+       ORDER BY created_at DESC LIMIT ?`,
+      [sessionId, limit]
+    );
+    return rows.map(this.rowToMemory);
+  }
+
+  rowToMemory(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      type: row.type,
+      content: row.content,
+      source: row.source,
+      importance: row.importance,
+      confidence: row.confidence,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastAccessedAt: row.last_accessed_at,
+      tags: JSON.parse(row.tags || '[]'),
+      sessionId: row.session_id,
+      metadata: JSON.parse(row.metadata || '{}'),
+      status: row.status
+    };
+  }
+
+  async close() {
+    if (this.db) {
+      await this.db.close();
+      this.initialized = false;
+    }
+  }
+}
+
+export default MemoryStore;
+============================================================
+📄 ARCHIVO: backend/src/memory/memoryRetriever.js
+============================================================
+// backend/src/memory/memoryRetriever.js
+// 🔎 RECUPERADOR DE MEMORIA
+
+import { logger } from '../core/logger.js';
+import { MEMORY_STATUS } from './memoryTypes.js';
+
+class MemoryRetriever {
+  constructor(store) {
+    this.store = store;
+  }
+
+  async search(query, options = {}) {
+    if (!this.store) {
+      logger.warn('[MemoryRetriever] Store no disponible');
+      return [];
+    }
+
+    try {
+      const results = await this.store.search(query, options);
+      return results;
+    } catch (error) {
+      logger.error('[MemoryRetriever] Error en búsqueda', {
+        error: error.message
+      });
+      return [];
+    }
+  }
+
+  rankByRelevance(memories, query) {
+    if (!memories || memories.length === 0) return [];
+    
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    return memories.sort((a, b) => {
+      const scoreA = this.calculateScore(a, queryWords);
+      const scoreB = this.calculateScore(b, queryWords);
+      return scoreB - scoreA;
+    });
+  }
+
+  calculateScore(memory, queryWords) {
+    let score = 0;
+    const content = memory.content.toLowerCase();
+    const tags = memory.tags || [];
+
+    // Puntaje por coincidencia de palabras
+    for (const word of queryWords) {
+      if (content.includes(word)) {
+        score += 2;
+      }
+    }
+
+    // Puntaje por coincidencia de tags
+    for (const tag of tags) {
+      if (queryWords.some(w => tag.toLowerCase().includes(w))) {
+        score += 3;
+      }
+    }
+
+    // Peso por importancia
+    score += (memory.importance || 1) * 2;
+
+    // Peso por actualidad (más reciente = más relevante)
+    const age = Date.now() - new Date(memory.createdAt).getTime();
+    const days = age / (1000 * 60 * 60 * 24);
+    score += Math.max(0, 1 - days / 30);
+
+    // Bono por confianza alta
+    if (memory.confidence > 0.8) {
+      score += 2;
+    }
+
+    return score;
+  }
+
+  async getRelated(memoryId, limit = 5) {
+    if (!this.store) return [];
+
+    try {
+      const memory = await this.store.get(memoryId);
+      if (!memory) return [];
+
+      const tags = memory.tags || [];
+      if (tags.length === 0) return [];
+
+      const results = await this.store.list({
+        tags: tags,
+        limit: limit + 1,
+        status: MEMORY_STATUS.ACTIVE
+      });
+
+      // Excluir la memoria original
+      return results.filter(m => m.id !== memoryId).slice(0, limit);
+    } catch (error) {
+      logger.error('[MemoryRetriever] Error obteniendo relacionadas', {
+        error: error.message
+      });
+      return [];
+    }
+  }
+
+  async getLatest(sessionId, limit = 10) {
+    if (!this.store) return [];
+
+    try {
+      const memories = await this.store.list({
+        sessionId,
+        limit,
+        status: MEMORY_STATUS.ACTIVE
+      });
+      return memories;
+    } catch (error) {
+      logger.error('[MemoryRetriever] Error obteniendo últimas', {
+        error: error.message
+      });
+      return [];
+    }
+  }
+
+  async getByType(type, sessionId, limit = 20) {
+    if (!this.store) return [];
+
+    try {
+      const memories = await this.store.list({
+        type,
+        sessionId,
+        limit,
+        status: MEMORY_STATUS.ACTIVE
+      });
+      return memories;
+    } catch (error) {
+      logger.error('[MemoryRetriever] Error obteniendo por tipo', {
+        error: error.message
+      });
+      return [];
+    }
+  }
+}
+
+export default MemoryRetriever;
+============================================================
+📄 ARCHIVO: backend/src/memory/factExtractor.js
+============================================================
+// backend/src/memory/factExtractor.js
+// 🔍 EXTRACTOR DE HECHOS - VERSIÓN PRECISA Y ESTRUCTURADA
+
+import { MEMORY_TYPES, MEMORY_IMPORTANCE } from './memoryTypes.js';
+
+class FactExtractor {
+  constructor() {
+    // 🆕 PATRONES PRECISOS CON LÍMITES CLAROS
+    this.patterns = {
+      // Nombre - captura hasta el primer punto, coma, o fin de frase
+      user_name: [
+        /(?:mi nombre es|me llamo|llamo|soy)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúÑñ]+){0,2})(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i,
+        /(?:nombre|user)\s*:\s*([A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúÑñ]+){0,2})(?=[.,;!?]|$)/i
+      ],
+      
+      // Color favorito - captura hasta el primer punto, coma, o fin de frase
+      favorite_color: [
+        /(?:mi color favorito es|color favorito|color preferido es)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]+)(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i,
+        /(?:color)\s*:\s*([A-Za-zÁÉÍÓÚáéíóúÑñ]+)(?=[.,;!?]|$)/i
+      ],
+      
+      // Comida favorita
+      favorite_food: [
+        /(?:mi comida favorita es|comida favorita|me gusta comer)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+)(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i
+      ],
+      
+      // Música favorita
+      favorite_music: [
+        /(?:mi música favorita es|música favorita|genero favorito es)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+)(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i
+      ],
+      
+      // Proyecto
+      project_name: [
+        /(?:mi proyecto se llama|proyecto|sistema)\s+["']?([A-Za-z0-9_\-]+)["']?(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i,
+        /(?:proyecto)\s*:\s*["']?([A-Za-z0-9_\-]+)["']?(?=[.,;!?]|$)/i
+      ],
+      
+      // Tecnología/Tech Stack
+      tech_stack: [
+        /(?:usamos|utilizamos|trabajamos con|tecnología|stack)\s+["']?([A-Za-z0-9_\-\.]+)["']?(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i
+      ],
+      
+      // Ocupación
+      occupation: [
+        /(?:soy|trabajo como|ocupación)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+)(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i
+      ],
+      
+      // Ubicación
+      location: [
+        /(?:vivo en|estoy en|ubicación|ciudad)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+)(?=[.,;!?]|$|\s+y\s+|\s+pero\s+|\s+porque\s+)/i
+      ]
+    };
+  }
+
+  extract(text) {
+    if (!text || typeof text !== 'string') return [];
+
+    const facts = [];
+
+    for (const [type, patterns] of Object.entries(this.patterns)) {
+      const patternArray = Array.isArray(patterns) ? patterns : [patterns];
+      
+      for (const pattern of patternArray) {
+        const match = text.match(pattern);
+        if (match) {
+          const value = match[1].trim();
+          
+          // 🆕 VALIDAR QUE EL VALOR NO SEA LA PREGUNTA MISMA
+          if (this._isValidValue(value, text, type)) {
+            facts.push({
+              type: type,
+              key: type,
+              value: value,
+              original: match[0],
+              importance: this.getImportance(type),
+              confidence: this.getConfidence(type, value, match[0])
+            });
+          }
+        }
+      }
+    }
+
+    return facts;
+  }
+
+  // 🆕 VALIDAR QUE EL VALOR EXTRAÍDO SEA VÁLIDO
+  _isValidValue(value, originalText, type) {
+    if (!value || value.length < 2) return false;
+    
+    // No permitir que el valor sea una pregunta
+    const questionWords = ['cual', 'cuál', 'que', 'qué', 'como', 'cómo', 'cuando', 'cuándo', 'donde', 'dónde'];
+    if (questionWords.some(word => value.toLowerCase().includes(word))) {
+      return false;
+    }
+    
+    // No permitir que el valor sea demasiado largo (más de 50 caracteres para datos personales)
+    if (value.length > 50 && type !== 'tech_stack') {
+      return false;
+    }
+    
+    // No permitir que el valor contenga la pregunta original
+    if (originalText.toLowerCase().includes('cual') || originalText.toLowerCase().includes('cuál')) {
+      // Si la pregunta contiene "cual", el valor no debería ser la pregunta misma
+      if (value.length < 10 && questionWords.some(w => value.toLowerCase().includes(w))) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  getImportance(type) {
+    const importanceMap = {
+      user_name: MEMORY_IMPORTANCE.USER_NAME,
+      favorite_color: MEMORY_IMPORTANCE.FAVORITE_COLOR,
+      project_name: MEMORY_IMPORTANCE.PROJECT_NAME,
+      tech_stack: MEMORY_IMPORTANCE.TECH_STACK,
+      favorite_food: MEMORY_IMPORTANCE.HIGH,
+      favorite_music: MEMORY_IMPORTANCE.HIGH,
+      occupation: MEMORY_IMPORTANCE.HIGH,
+      location: MEMORY_IMPORTANCE.MEDIUM,
+      birthday: MEMORY_IMPORTANCE.HIGH
+    };
+    return importanceMap[type] || MEMORY_IMPORTANCE.MEDIUM;
+  }
+
+  getConfidence(type, value, original) {
+    let confidence = 0.7;
+    
+    // Mayor confianza si el patrón es exacto
+    const exactMatch = original.match(new RegExp(`(?:mi|el|la)\\s+${type.replace('_', ' ')}\\s+(?:es|favorito|favorita|preferido)\\s+${value}`, 'i'));
+    if (exactMatch) {
+      confidence += 0.2;
+    }
+    
+    // Mayor confianza si el valor es corto y específico
+    if (value.length < 20) {
+      confidence += 0.1;
+    }
+    
+    // Mayor confianza si no contiene palabras de pregunta
+    const questionWords = ['cual', 'cuál', 'que', 'qué', 'como', 'cómo'];
+    if (!questionWords.some(w => value.toLowerCase().includes(w))) {
+      confidence += 0.05;
+    }
+    
+    return Math.min(confidence, 0.98);
+  }
+
+  // 🆕 EXTRAER SOLO UN TIPO ESPECÍFICO
+  extractType(text, type) {
+    if (!this.patterns[type]) return null;
+    
+    const patterns = Array.isArray(this.patterns[type]) ? this.patterns[type] : [this.patterns[type]];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const value = match[1].trim();
+        if (this._isValidValue(value, text, type)) {
+          return {
+            type: type,
+            key: type,
+            value: value,
+            original: match[0],
+            importance: this.getImportance(type),
+            confidence: this.getConfidence(type, value, match[0])
+          };
+        }
+      }
+    }
+    
+    return null;
+  }
+}
+
+export default FactExtractor;
+============================================================
+📄 ARCHIVO: backend/src/memory/memorySummarizer.js
+============================================================
+// backend/src/memory/memorySummarizer.js
+// 📝 RESUMIDOR DE MEMORIA Y CONTEXTO
+
+import { MEMORY_TYPES } from './memoryTypes.js';
+
+class MemorySummarizer {
+  constructor(config = {}) {
+    this.maxContextItems = config.maxContextItems || 10;
+    this.maxSummaryLength = config.maxSummaryLength || 1000;
+  }
+
+  summarizeContext(memories) {
+    if (!memories || memories.length === 0) {
+      return 'No hay información recordada previamente.';
+    }
+
+    const sorted = [...memories].sort((a, b) => 
+      new Date(b.lastAccessedAt) - new Date(a.lastAccessedAt)
+    );
+
+    const relevant = sorted.slice(0, this.maxContextItems);
+    let summary = '';
+
+    // Agrupar por tipo
+    const grouped = this.groupByType(relevant);
+
+    // Hechos importantes
+    if (grouped.fact && grouped.fact.length > 0) {
+      summary += '📌 Hechos importantes:\n';
+      for (const mem of grouped.fact.slice(0, 5)) {
+        summary += `  • ${mem.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Preferencias
+    if (grouped.preference && grouped.preference.length > 0) {
+      summary += '⭐ Preferencias del usuario:\n';
+      for (const mem of grouped.preference.slice(0, 3)) {
+        summary += `  • ${mem.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Decisiones
+    if (grouped.decision && grouped.decision.length > 0) {
+      summary += '⚡ Decisiones tomadas:\n';
+      for (const mem of grouped.decision.slice(0, 3)) {
+        summary += `  • ${mem.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Conocimiento del proyecto
+    if (grouped.project_knowledge && grouped.project_knowledge.length > 0) {
+      summary += '🏗️ Conocimiento del proyecto:\n';
+      for (const mem of grouped.project_knowledge.slice(0, 3)) {
+        summary += `  • ${mem.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Si no hay resumen estructurado, mostrar las más recientes
+    if (!summary) {
+      summary += '📝 Últimas interacciones:\n';
+      for (const mem of relevant.slice(0, 5)) {
+        const date = new Date(mem.createdAt).toLocaleDateString();
+        const preview = mem.content.length > 80 ? mem.content.substring(0, 80) + '...' : mem.content;
+        summary += `  • [${mem.type}] ${preview} (${date})\n`;
+      }
+    }
+
+    return summary.trim();
+  }
+
+  groupByType(memories) {
+    const grouped = {};
+    for (const mem of memories) {
+      const type = mem.type;
+      if (!grouped[type]) grouped[type] = [];
+      grouped[type].push(mem);
+    }
+    return grouped;
+  }
+
+  summarizeConversation(memories) {
+    if (!memories || memories.length === 0) {
+      return 'No hay suficiente información para resumir.';
+    }
+
+    const sorted = [...memories].sort((a, b) => 
+      new Date(a.createdAt) - new Date(b.createdAt)
+    );
+
+    const facts = sorted.filter(m => m.type === 'fact' || m.type === 'project_knowledge');
+    const decisions = sorted.filter(m => m.type === 'decision');
+    const preferences = sorted.filter(m => m.type === 'preference');
+    const context = sorted.filter(m => m.type === 'context');
+
+    let summary = '📋 Resumen de la conversación:\n\n';
+
+    // Información del usuario
+    summary += '👤 Sobre el usuario:\n';
+    const userFacts = facts.filter(f => f.tags?.includes('user_name') || f.tags?.includes('email'));
+    if (userFacts.length > 0) {
+      for (const f of userFacts) {
+        summary += `  • ${f.content}\n`;
+      }
+    } else {
+      summary += '  • No se ha recopilado información personal aún.\n';
+    }
+    summary += '\n';
+
+    // Hechos importantes
+    if (facts.length > 0) {
+      summary += '📌 Hechos importantes:\n';
+      for (const f of facts.slice(0, 5)) {
+        summary += `  • ${f.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Decisiones
+    if (decisions.length > 0) {
+      summary += '⚡ Decisiones tomadas:\n';
+      for (const d of decisions.slice(0, 3)) {
+        summary += `  • ${d.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Preferencias
+    if (preferences.length > 0) {
+      summary += '⭐ Preferencias del usuario:\n';
+      for (const p of preferences.slice(0, 3)) {
+        summary += `  • ${p.content}\n`;
+      }
+      summary += '\n';
+    }
+
+    // Estadísticas
+    summary += '📊 Estadísticas:\n';
+    summary += `  • Total de interacciones: ${sorted.length}\n`;
+    summary += `  • Hechos registrados: ${facts.length}\n`;
+    summary += `  • Decisiones: ${decisions.length}\n`;
+    summary += `  • Preferencias: ${preferences.length}\n`;
+
+    return summary;
+  }
+
+  summarizeByType(memories, type) {
+    const filtered = memories.filter(m => m.type === type);
+    if (filtered.length === 0) return null;
+
+    const summary = filtered.map(m => `• ${m.content}`).join('\n');
+    return `📌 ${type.charAt(0).toUpperCase() + type.slice(1)}s:\n${summary}`;
+  }
+
+  getKeyFacts(memories) {
+    const facts = memories.filter(m => 
+      m.type === 'fact' || 
+      m.type === 'project_knowledge' ||
+      m.type === 'preference' ||
+      m.type === 'decision'
+    );
+
+    // Ordenar por importancia y confianza
+    return facts.sort((a, b) => {
+      const scoreA = (a.importance || 1) * (a.confidence || 0.5);
+      const scoreB = (b.importance || 1) * (b.confidence || 0.5);
+      return scoreB - scoreA;
+    });
+  }
+}
+
+export default MemorySummarizer;
+============================================================
+📄 ARCHIVO: backend/src/memory/memoryTypes.js
+============================================================
+// backend/src/memory/memoryTypes.js
+// 🧠 TIPOS DE MEMORIA COGNITIVA - VERSIÓN ESTRUCTURADA
+
+export const MEMORY_TYPES = {
+  FACT: 'fact',
+  PREFERENCE: 'preference',
+  DECISION: 'decision',
+  EVENT: 'event',
+  SUMMARY: 'summary',
+  PROJECT_KNOWLEDGE: 'project_knowledge',
+  CONTEXT: 'context',
+  CONVERSATION: 'conversation',
+  USER_INFO: 'user_info',
+  
+  // 🆕 TIPOS ESTRUCTURADOS PARA MEMORIA PERSONAL
+  USER_NAME: 'user_name',
+  FAVORITE_COLOR: 'favorite_color',
+  FAVORITE_FOOD: 'favorite_food',
+  FAVORITE_MUSIC: 'favorite_music',
+  FAVORITE_MOVIE: 'favorite_movie',
+  BIRTHDAY: 'birthday',
+  OCCUPATION: 'occupation',
+  LOCATION: 'location',
+  PROJECT_NAME: 'project_name',
+  TECH_STACK: 'tech_stack'
+};
+
+export const MEMORY_IMPORTANCE = {
+  LOW: 1,
+  MEDIUM: 3,
+  HIGH: 5,
+  CRITICAL: 10,
+  
+  // 🆕 IMPORTANCIA POR TIPO
+  USER_NAME: 10,
+  FAVORITE_COLOR: 5,
+  PROJECT_NAME: 8,
+  TECH_STACK: 6
+};
+
+export const MEMORY_STATUS = {
+  ACTIVE: 'active',
+  ARCHIVED: 'archived',
+  DEPRECATED: 'deprecated'
+};
+
+export const MEMORY_SOURCES = {
+  USER: 'user',
+  SYSTEM: 'system',
+  AGENT: 'agent',
+  EXTRACTED: 'extracted'
+};
+
+// 🆕 ESTRUCTURA DE MEMORIA CON CLAVE/VALOR
+export const MEMORY_STRUCTURE = {
+  KEY_VALUE: 'key_value',  // Para memorias estructuradas tipo clave/valor
+  FREE_TEXT: 'free_text',  // Para texto libre
+  CONTEXTUAL: 'contextual' // Para contexto de conversación
+};
+
+export default {
+  MEMORY_TYPES,
+  MEMORY_IMPORTANCE,
+  MEMORY_STATUS,
+  MEMORY_SOURCES,
+  MEMORY_STRUCTURE
+};
+============================================================
+📄 ARCHIVO: backend/src/routes/memoryRoutes.js
+============================================================
+// backend/src/routes/memoryRoutes.js
+// 🎯 Rutas de memoria y estado del sistema
+// 🧠 CON MEMORIA COGNITIVA PERSISTENTE (Fase 4.1)
+
+import express from 'express';
+import memoryService from '../services/memoryService.js';
+import { cognitiveMemory } from '../app.js';
+
+const router = express.Router();
+
+// ─── HISTORIAL DE CONVERSACIÓN ──────────────────────────────
+router.get('/memory/history', async (req, res) => {
+  const { sessionId, limit } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    const history = await memoryService.getConversationHistory(sessionId, parseInt(limit) || 20);
+    res.json({ success: true, history });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── CONTEXTO DE CONVERSACIÓN ──────────────────────────────
+router.get('/memory/context', async (req, res) => {
+  const { sessionId } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    const context = await memoryService.getContext(sessionId);
+    res.json({ success: true, context });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── PUBLICACIONES GUARDADAS ────────────────────────────────
+router.get('/memory/publications', async (req, res) => {
+  const { limit } = req.query;
+  
+  try {
+    const publications = await memoryService.getPublications(parseInt(limit) || 50);
+    res.json({ success: true, publications });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── GUARDAR PUBLICACIÓN MANUAL ─────────────────────────────
+router.post('/memory/publication', async (req, res) => {
+  const { titulo, postId, success, metadata } = req.body;
+  
+  try {
+    const result = await memoryService.savePublication({
+      titulo,
+      postId,
+      success,
+      metadata: metadata || {}
+    });
+    res.json({ success: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── LIMPIAR HISTORIAL ──────────────────────────────────────
+router.delete('/memory/clear', async (req, res) => {
+  const { sessionId } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    const result = await memoryService.clearSession(sessionId);
+    res.json({ success: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── ESTADO DEL SISTEMA ──────────────────────────────────────
+router.get('/memory/state', async (req, res) => {
+  try {
+    const state = await memoryService.getSystemState();
+    res.json({ success: true, state });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// 🧠 RUTAS DE MEMORIA COGNITIVA (Fase 4.1)
+// ════════════════════════════════════════════════════════════
+
+// ─── GUARDAR EN MEMORIA COGNITIVA ──────────────────────────
+router.post('/memory/cognitive/remember', async (req, res) => {
+  const { content, type, sessionId, importance, tags } = req.body;
+  
+  if (!content) {
+    return res.status(400).json({ error: 'Se requiere content' });
+  }
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const result = await cognitiveMemory.remember(content, {
+      type: type || 'fact',
+      source: 'user',
+      sessionId,
+      importance: importance || 3,
+      tags: tags || []
+    });
+    
+    res.json({ 
+      success: true, 
+      memory: result,
+      message: 'Memoria guardada exitosamente'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── RECORDAR DE MEMORIA COGNITIVA ──────────────────────────
+router.get('/memory/cognitive/recall', async (req, res) => {
+  const { query, sessionId, limit } = req.query;
+  
+  if (!query) {
+    return res.status(400).json({ error: 'Se requiere query' });
+  }
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const memories = await cognitiveMemory.recall(query, {
+      sessionId,
+      limit: parseInt(limit) || 5
+    });
+    
+    res.json({ 
+      success: true, 
+      memories,
+      count: memories.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── OBTENER CONTEXTO COGNITIVO ─────────────────────────────
+router.get('/memory/cognitive/context', async (req, res) => {
+  const { sessionId, limit } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const result = await cognitiveMemory.getContext(
+      sessionId, 
+      parseInt(limit) || 10
+    );
+    
+    res.json({ 
+      success: true, 
+      context: result.context,
+      memories: result.memories,
+      count: result.memories?.length || 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── EXTRAER HECHOS DE UN TEXTO ─────────────────────────────
+router.post('/memory/cognitive/extract-facts', async (req, res) => {
+  const { text } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ error: 'Se requiere text' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const facts = await cognitiveMemory.extractFacts(text);
+    
+    res.json({ 
+      success: true, 
+      facts,
+      count: facts.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── EXTRAER Y GUARDAR HECHOS AUTOMÁTICAMENTE ──────────────
+router.post('/memory/cognitive/extract-and-save', async (req, res) => {
+  const { text, sessionId, tags } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ error: 'Se requiere text' });
+  }
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const facts = await cognitiveMemory.extractAndRemember(text, {
+      sessionId,
+      tags: tags || []
+    });
+    
+    res.json({ 
+      success: true, 
+      facts,
+      count: facts.length,
+      message: `${facts.length} hechos extraídos y guardados`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── RESUMEN DE CONVERSACIÓN COGNITIVA ──────────────────────
+router.get('/memory/cognitive/summary', async (req, res) => {
+  const { sessionId } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const summary = await cognitiveMemory.summarizeConversation(sessionId);
+    
+    res.json({ 
+      success: true, 
+      summary
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── LISTAR MEMORIAS POR TIPO ────────────────────────────────
+router.get('/memory/cognitive/by-type', async (req, res) => {
+  const { type, sessionId, limit } = req.query;
+  
+  if (!type) {
+    return res.status(400).json({ error: 'Se requiere type' });
+  }
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const memories = await cognitiveMemory.getByType(
+      type,
+      sessionId,
+      parseInt(limit) || 20
+    );
+    
+    res.json({ 
+      success: true, 
+      memories,
+      count: memories.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── ÚLTIMAS MEMORIAS DE UNA SESIÓN ─────────────────────────
+router.get('/memory/cognitive/latest', async (req, res) => {
+  const { sessionId, limit } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const memories = await cognitiveMemory.getLatest(
+      sessionId,
+      parseInt(limit) || 10
+    );
+    
+    res.json({ 
+      success: true, 
+      memories,
+      count: memories.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── OLVIDAR MEMORIA (MARCAR COMO DEPRECADA) ────────────────
+router.delete('/memory/cognitive/forget/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  if (!id) {
+    return res.status(400).json({ error: 'Se requiere id' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    await cognitiveMemory.forget(id);
+    
+    res.json({ 
+      success: true, 
+      message: `Memoria ${id} marcada como deprecada`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── MÉTRICAS DE MEMORIA COGNITIVA ──────────────────────────
+router.get('/memory/cognitive/metrics', async (req, res) => {
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    const metrics = cognitiveMemory.getMetrics();
+    
+    res.json({ 
+      success: true, 
+      metrics
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── LIMPIAR MEMORIA COGNITIVA DE UNA SESIÓN ────────────────
+router.delete('/memory/cognitive/clear-session', async (req, res) => {
+  const { sessionId } = req.query;
+  
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Se requiere sessionId' });
+  }
+  
+  try {
+    if (!cognitiveMemory) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Memoria cognitiva no disponible' 
+      });
+    }
+    
+    // Obtener todas las memorias de la sesión
+    const memories = await cognitiveMemory.getLatest(sessionId, 1000);
+    
+    // Marcar cada una como deprecada
+    for (const mem of memories) {
+      await cognitiveMemory.forget(mem.id);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Se limpiaron ${memories.length} memorias de la sesión ${sessionId}`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
+============================================================
+📄 ARCHIVO: backend/src/services/reasoningService.js
+============================================================
+// backend/src/services/reasoningService.js
+// 🧠 REASONING SERVICE - Generación de planes con conciencia arquitectónica
+// 🔒 RESPONSABILIDAD: Crear planes estructurados usando contexto y conocimiento del sistema
+// 🧠 CON MEMORIA COGNITIVA PERSISTENTE (Fase 4.1)
+
+import { BaseService } from '../core/serviceInterface.js';
+import { logger } from '../core/logger.js';
+import { eventBus } from '../core/eventBus.js';
+import CognitiveMemoryService from '../memory/cognitiveMemoryService.js';
+
+export class ReasoningService extends BaseService {
+  constructor({
+    contextService,
+    contextWindowManager,
+    aiProvider,
+    queryPlanner = null,
+    knowledgeService = null,
+    cognitiveMemoryService = null,
+    config = {}
+  }) {
+    super(config);
+    this.name = 'ReasoningService';
+    this.contextService = contextService;
+    this.contextWindowManager = contextWindowManager;
+    this.aiProvider = aiProvider;
+    this.queryPlanner = queryPlanner;
+    this.knowledge = knowledgeService;
+    this.cognitiveMemory = cognitiveMemoryService;
+    this.initialized = false;
+    this.memoryInitialized = false;
+
+    this.config = {
+      maxSteps: 10,
+      minConfidence: 0.3,
+      maxTokens: 8000,
+      enableCognitiveMemory: true,
+      maxMemoriesPerQuery: 5,
+      minMemoryImportance: 2,
+      ...config
+    };
+  }
+
+  async initialize() {
+    try {
+      this.status = 'initializing';
+      
+      logger.info('[ReasoningService] Inicializando...');
+      
+      // Inicializar memoria cognitiva si está disponible
+      if (this.cognitiveMemory && this.config.enableCognitiveMemory) {
+        try {
+          await this.cognitiveMemory.initialize();
+          this.memoryInitialized = true;
+          logger.info('[ReasoningService] Memoria cognitiva inicializada');
+        } catch (memoryError) {
+          logger.warn('[ReasoningService] Error inicializando memoria cognitiva', {
+            error: memoryError.message
+          });
+          this.memoryInitialized = false;
+        }
+      }
+      
+      this.initialized = true;
+      this.status = 'online';
+      
+      logger.info('[ReasoningService] Inicializado', {
+        queryPlannerAvailable: !!this.queryPlanner,
+        knowledgeAvailable: !!this.knowledge,
+        memoryAvailable: this.memoryInitialized
+      });
+      
+      return true;
+    } catch (error) {
+      this.status = 'error';
+      logger.error('[ReasoningService] Error inicializando', {
+        error: error.message
+      });
+      return false;
+    }
+  }
+
+  /**
+   * 🔒 MÉTODO PÚBLICO: Crea un plan con conciencia arquitectónica y memoria cognitiva
+   */
+  async createPlan(query, sessionId, options = {}) {
+    const traceId = global.traceId || 'no-trace';
+    const startTime = Date.now();
+
+    logger.debug('[ReasoningService] Creando plan', { query, sessionId, traceId });
+
+    try {
+      // ✅ PRIMERO: Intentar recordar información personal
+      let personalMemories = [];
+      
+      if (this.memoryInitialized && this.config.enableCognitiveMemory) {
+        try {
+          const recallResult = await this._recallMemories(query, sessionId);
+          personalMemories = recallResult.memories;
+          
+          if (personalMemories.length > 0 && this._isPersonalQuery(query)) {
+            const response = this._buildPersonalResponse(query, personalMemories);
+            if (response) {
+              logger.info('[ReasoningService] Respondiendo desde memoria personal', {
+                sessionId,
+                traceId,
+                memoriesCount: personalMemories.length
+              });
+              return {
+                success: true,
+                plan: {
+                  steps: [{
+                    id: 'personal_response',
+                    type: 'action',
+                    description: 'Respuesta basada en memoria personal',
+                    action: 'respond',
+                    output: response
+                  }],
+                  metadata: { type: 'personal', source: 'memory' }
+                },
+                confidence: 0.95,
+                contextUsed: true,
+                contextSources: ['cognitive_memory'],
+                metadata: { 
+                  traceId, 
+                  sessionId, 
+                  memoriesUsed: personalMemories.length,
+                  duration: Date.now() - startTime
+                }
+              };
+            }
+          }
+        } catch (error) {
+          logger.warn('[ReasoningService] Error en recall personal', { 
+            error: error.message,
+            traceId 
+          });
+        }
+      }
+
+      // ─── VERIFICAR SI ES CONSULTA DE ARQUITECTURA ──────────
+      const isArchitectureQuery = this._isArchitectureQuery(query);
+      
+      if (isArchitectureQuery && this.queryPlanner) {
+        logger.debug('[ReasoningService] Detectada consulta de arquitectura', { query, traceId });
+        
+        try {
+          const architectureResult = await this._handleArchitectureQuery(query, sessionId, traceId);
+          
+          // Guardar en memoria cognitiva
+          await this._saveToMemory(query, architectureResult.plan, sessionId, 'architecture');
+          
+          return {
+            success: true,
+            plan: architectureResult.plan,
+            confidence: 0.95,
+            contextUsed: true,
+            contextSources: ['architecture_knowledge'],
+            metadata: {
+              traceId,
+              sessionId,
+              duration: Date.now() - startTime,
+              architectureQuery: true,
+              knowledgeUsed: true,
+              memoryUsed: this.memoryInitialized,
+              ...architectureResult.metadata
+            }
+          };
+        } catch (error) {
+          logger.error('[ReasoningService] Falló consulta de arquitectura', {
+            error: error.message,
+            traceId
+          });
+          return {
+            success: false,
+            error: error.message,
+            plan: null,
+            confidence: 0,
+            contextUsed: false,
+            contextSources: [],
+            metadata: {
+              traceId,
+              sessionId,
+              duration: Date.now() - startTime,
+              architectureQuery: true,
+              error: error.message
+            }
+          };
+        }
+      }
+
+      // ─── FLUJO NORMAL DE RAZONAMIENTO ──────────────────────
+      
+      // 3.1 Obtener contexto enriquecido
+      let contextResult = null;
+      if (this.contextService) {
+        try {
+          contextResult = await this.contextService.getContext({
+            sessionId,
+            query,
+            options: {
+              includeArchitecture: true,
+              ...options
+            }
+          });
+        } catch (contextError) {
+          logger.warn('[ReasoningService] Error obteniendo contexto', {
+            error: contextError.message,
+            traceId
+          });
+          contextResult = null;
+        }
+      }
+
+      // 3.2 Optimizar ventana de contexto
+      let windowResult = null;
+      if (this.contextWindowManager && contextResult) {
+        try {
+          windowResult = this.contextWindowManager.buildWindow({
+            query,
+            context: contextResult,
+            maxTokens: this.config.maxTokens
+          });
+        } catch (windowError) {
+          logger.warn('[ReasoningService] Error construyendo ventana', {
+            error: windowError.message,
+            traceId
+          });
+          windowResult = null;
+        }
+      }
+
+      // 3.3 RECUPERAR MEMORIA COGNITIVA
+      let memories = personalMemories;
+      let memoryContext = '';
+      if (this.memoryInitialized && this.config.enableCognitiveMemory && memories.length === 0) {
+        try {
+          const recallResult = await this._recallMemories(query, sessionId);
+          memories = recallResult.memories;
+          memoryContext = recallResult.context;
+          
+          if (memories.length > 0) {
+            logger.debug('[ReasoningService] Memorias recuperadas', {
+              count: memories.length,
+              sessionId,
+              traceId
+            });
+          }
+        } catch (memoryError) {
+          logger.warn('[ReasoningService] Error recuperando memorias', {
+            error: memoryError.message,
+            traceId
+          });
+        }
+      } else if (memories.length > 0 && this.cognitiveMemory?.summarizer) {
+        memoryContext = this.cognitiveMemory.summarizer.summarizeContext(memories) || '';
+      }
+
+      // 3.4 Enriquecer contexto con conocimiento del sistema y memoria
+      const enrichedContext = await this._enrichWithKnowledge(
+        query,
+        contextResult || {},
+        windowResult || {},
+        memoryContext,
+        memories
+      );
+
+      // 3.5 Generar plan con IA (incluyendo memoria)
+      const plan = await this._generatePlanWithKnowledge(
+        query,
+        enrichedContext,
+        sessionId,
+        memories
+      );
+
+      // 3.6 Validar plan
+      const validated = this._validatePlan(plan);
+
+      // 3.7 Calcular confianza
+      const confidence = this._classifyConfidence(validated, contextResult || {});
+
+      // 3.8 Analizar impacto del contexto
+      const contextImpact = this._validateContextImpact(contextResult || {});
+
+      // 3.9 GUARDAR EN MEMORIA COGNITIVA
+      await this._saveToMemory(query, validated, sessionId, 'conversation', memories);
+
+      const result = {
+        success: true,
+        plan: validated,
+        confidence,
+        contextUsed: contextImpact.relevantSources?.length > 0 || false,
+        contextSources: contextImpact.relevantSources || [],
+        metadata: {
+          traceId,
+          sessionId,
+          duration: Date.now() - startTime,
+          contextImpact,
+          architectureAware: true,
+          knowledgeUsed: enrichedContext.knowledgeUsed || false,
+          memoryUsed: this.memoryInitialized && memories.length > 0,
+          memoriesCount: memories.length,
+          ...(plan?.metadata || {})
+        }
+      };
+
+      // Emitir evento
+      eventBus.emit('reasoning:planCreated', {
+        sessionId,
+        planLength: validated?.steps?.length || 0,
+        confidence,
+        traceId,
+        architectureQuery: isArchitectureQuery,
+        memoriesUsed: memories.length
+      });
+
+      return result;
+
+    } catch (error) {
+      logger.error('[ReasoningService] Error creando plan', {
+        error: error.message,
+        stack: error.stack,
+        traceId
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        plan: null,
+        confidence: 0,
+        contextUsed: false,
+        contextSources: [],
+        metadata: {
+          traceId,
+          sessionId,
+          duration: Date.now() - startTime
+        }
+      };
+    }
+  }
+
+  // ─── CONSULTAS DE ARQUITECTURA ─────────────────────────────
+
+  /**
+   * Maneja consultas de arquitectura directamente
+   * @private
+   */
+  async _handleArchitectureQuery(query, sessionId, traceId) {
+    // ✅ Verificar que QueryPlanner existe
+    if (!this.queryPlanner) {
+      throw new Error('QueryPlanner no disponible para consultas de arquitectura');
+    }
+
+    try {
+      const result = await this.queryPlanner.processQuery(query);
+      
+      if (!result || !result.response) {
+        throw new Error('QueryPlanner no devolvió una respuesta válida');
+      }
+
+      return {
+        plan: {
+          steps: [
+            {
+              id: 'architecture_query',
+              type: 'knowledge',
+              description: 'Consulta de arquitectura del sistema',
+              action: 'respond',
+              input: {
+                query: result.query,
+                response: result.response
+              },
+              output: result.response
+            }
+          ],
+          confidence: 0.95,
+          metadata: {
+            type: 'architecture',
+            source: 'QueryPlanner',
+            sessionId,
+            traceId
+          }
+        },
+        metadata: {
+          result
+        }
+      };
+    } catch (error) {
+      logger.error('[ReasoningService] Error en consulta de arquitectura', {
+        error: error.message,
+        traceId,
+        query
+      });
+      throw new Error(`Error en consulta de arquitectura: ${error.message}`);
+    }
+  }
+
+  /**
+   * Detecta si una consulta es sobre arquitectura
+   * @private
+   */
+  _isArchitectureQuery(query) {
+    if (!query || typeof query !== 'string') return false;
+    
+    const normalized = query.toLowerCase().trim();
+    
+    // PRIMERO: Verificar si es una consulta personal (NO es arquitectura)
+    const personalQueries = [
+      'como me llamo', 'cual es mi nombre', 'mi nombre es',
+      'recuerdas mi nombre', 'quien soy', 'color favorito',
+      'mi color favorito', 'prefiero', 'me gusta', 'recuerdas que',
+      'sabes mi nombre', 'cual es mi color', 'que color me gusta',
+      'mi nombre'
+    ];
+    
+    for (const personal of personalQueries) {
+      if (normalized.includes(personal)) {
+        return false;
+      }
+    }
+    
+    // Si no es personal, verificar patrones de arquitectura
+    const architecturePatterns = [
+      'qué métodos tiene', 'qué funciones tiene', 'qué expone',
+      'qué api tiene', 'métodos públicos', 'qué métodos',
+      'quién usa', 'quién utiliza', 'usado por', 'dependientes de',
+      'quién depende de', 'de qué depende', 'dependencias de',
+      'qué necesita', 'qué imports tiene', 'quien usa', 'depende de',
+      'impacto de', 'qué pasaría si', 'cambiar', 'modificar',
+      'eliminar', 'refactorizar', 'comparar', 'diferencia entre',
+      'vs', 'versus', 'compara', 'arquitectura', 'estructura del sistema',
+      'visión general', 'resumen', 'panorama', 'estado del sistema',
+      'lista de', 'todos los', 'componentes', 'servicios', 'agentes',
+      'qué componentes', 'cuántos servicios', 'cuántos agentes',
+      'cuántos componentes', 'cuántos', 'número de', 'total de',
+      'componentes aislados', 'sin dependencias', 'no depende de nadie',
+      'sin dependientes', 'aislados', 'qué es', 'describe',
+      'información de', 'detalles de', 'qué hace'
+    ];
+
+    return architecturePatterns.some(pattern => normalized.includes(pattern));
+  }
+
+  // ─── MÉTODOS PARA CONSULTAS PERSONALES ────────────────────
+
+  /**
+   * Detecta si una consulta es personal (nombre, color, etc.)
+   * @private
+   */
+  _isPersonalQuery(query) {
+    const normalized = query.toLowerCase().trim();
+    const personalPatterns = [
+      'como me llamo', 'cual es mi nombre', 'mi nombre es',
+      'recuerdas mi nombre', 'quien soy', 'color favorito',
+      'mi color favorito', 'prefiero', 'me gusta', 'recuerdas que',
+      'sabes mi nombre', 'cual es mi color', 'que color me gusta',
+      'mi nombre'
+    ];
+    return personalPatterns.some(p => normalized.includes(p));
+  }
+
+  /**
+   * Construye respuesta basada en memoria personal
+   * @private
+   */
+  _buildPersonalResponse(query, memories) {
+    const normalized = query.toLowerCase().trim();
+    
+    // ─── BUSCAR NOMBRE ──────────────────────────────
+    if (normalized.includes('nombre') || normalized.includes('llamo') || normalized.includes('sabes mi nombre')) {
+      const nameMemory = memories.find(m => 
+        m.type === 'user_name' ||
+        m.tags?.includes('user_name') ||
+        (m.content && m.content.toLowerCase().includes('nombre')) ||
+        (m.content && m.content.toLowerCase().includes('llamo'))
+      );
+      
+      if (nameMemory) {
+        const content = nameMemory.content || '';
+        let name = content
+          .replace(/^mi nombre es /i, '')
+          .replace(/^me llamo /i, '')
+          .replace(/^llamo /i, '')
+          .replace(/^soy /i, '')
+          .replace(/^nombre: /i, '')
+          .replace(/^mi nombre: /i, '')
+          .trim();
+        
+        if (name.length > 20 || name === query || query.includes(name)) {
+          const nameMatch = content.match(/(?:nombre es|me llamo|llamo|soy)\s*["']?([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,20})/i);
+          if (nameMatch) {
+            name = nameMatch[1].trim();
+          } else {
+            const wordMatch = content.match(/\b([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,20})\b/);
+            if (wordMatch && !['es','el','la','los','las','mi','tu','su','nuestro','vuestro','que','como','cuando','donde','porque','para'].includes(wordMatch[1].toLowerCase())) {
+              name = wordMatch[1];
+            } else {
+              return null;
+            }
+          }
+        }
+        
+        if (name.length < 2 || name.length > 20 || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ]+$/.test(name)) {
+          return null;
+        }
+        
+        return `¡Claro que lo recuerdo! Te llamas ${name}. 😊`;
+      }
+      return null;
+    }
+    
+    // ─── BUSCAR COLOR FAVORITO ──────────────────────
+    if (normalized.includes('color')) {
+      const colorMemory = memories.find(m => 
+        m.type === 'favorite_color' ||
+        m.tags?.includes('color') ||
+        (m.content && m.content.toLowerCase().includes('color'))
+      );
+      
+      if (colorMemory) {
+        const content = colorMemory.content || '';
+        let color = content
+          .replace(/^mi color favorito es /i, '')
+          .replace(/^el color favorito es /i, '')
+          .replace(/^color favorito: /i, '')
+          .replace(/^color: /i, '')
+          .replace(/^mi color favorito: /i, '')
+          .trim();
+        
+        if (color.length > 15 || color === query || query.includes(color)) {
+          const colorMatch = content.match(/(?:color favorito es|color favorito:)\s*["']?([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,15})/i);
+          if (colorMatch) {
+            color = colorMatch[1].trim();
+          } else {
+            const wordMatch = content.match(/\b([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,15})\b/);
+            if (wordMatch && !['es','el','la','los','las','mi','tu','su','nuestro','vuestro','que','como','cuando','donde','porque','para','favorito','color'].includes(wordMatch[1].toLowerCase())) {
+              color = wordMatch[1];
+            } else {
+              return null;
+            }
+          }
+        }
+        
+        if (color.length < 2 || color.length > 15 || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ]+$/.test(color)) {
+          return null;
+        }
+        
+        return `Sí, recuerdo que tu color favorito es ${color}. 🎨`;
+      }
+      return null;
+    }
+    
+    // ─── RESPUESTA GENERAL CON MEMORIAS PERSONALES ────
+    const personalMemories = memories.filter(m => 
+      m.type === 'user_name' || 
+      m.type === 'favorite_color' ||
+      m.tags?.includes('user_name') ||
+      m.tags?.includes('color')
+    );
+    
+    if (personalMemories.length > 0) {
+      const summary = personalMemories.slice(0, 5).map(m => {
+        let content = m.content || '';
+        if (content.length > 30) {
+          const short = content.match(/^([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+)/);
+          if (short) content = short[1];
+        }
+        return `• ${content}`;
+      }).join('\n');
+      return `Esto es lo que recuerdo sobre ti:\n${summary}`;
+    }
+    
+    return null;
+  }
+
+  // ─── MEMORIA COGNITIVA ──────────────────────────────────────
+
+  /**
+   * Recupera memorias relevantes para una consulta
+   * @private
+   */
+  async _recallMemories(query, sessionId) {
+    if (!this.cognitiveMemory || !this.memoryInitialized) {
+      return { memories: [], context: '' };
+    }
+
+    try {
+      // 🆕 Intentar extraer clave de la pregunta
+      const keyPatterns = {
+        user_name: /(?:nombre|llamo|llam|soy|quien|quién)\s*(?:es|soy|me llamo)?/i,
+        favorite_color: /(?:color favorito|color preferido)/i,
+        project_name: /(?:proyecto|sistema)\s*(?:se llama|llama|nombre)?/i,
+        tech_stack: /(?:tecnología|stack|herramientas)/i
+      };
+
+      let keyMatch = null;
+      for (const [key, pattern] of Object.entries(keyPatterns)) {
+        if (pattern.test(query)) {
+          keyMatch = key;
+          break;
+        }
+      }
+
+      let memories = [];
+      
+      if (keyMatch) {
+        // 🆕 Buscar por clave específica
+        const result = await this.cognitiveMemory.recallByKey(keyMatch, sessionId);
+        if (result.exists) {
+          memories = [result.memory];
+        }
+      }
+
+      // Si no se encontró por clave, hacer búsqueda normal
+      if (memories.length === 0) {
+        memories = await this.cognitiveMemory.recall(query, {
+          sessionId,
+          minImportance: this.config.minMemoryImportance,
+          limit: this.config.maxMemoriesPerQuery
+        });
+      }
+
+      let context = '';
+      if (memories.length > 0) {
+        context = this.cognitiveMemory.summarizer?.summarizeContext(memories) || '';
+      }
+
+      return { memories, context };
+    } catch (error) {
+      logger.warn('[ReasoningService] Error en recall de memoria', {
+        error: error.message
+      });
+      return { memories: [], context: '' };
+    }
+  }
+
+  /**
+   * Guarda información en memoria cognitiva
+   * @private
+   */
+  async _saveToMemory(query, plan, sessionId, type = 'conversation', existingMemories = []) {
+    if (!this.cognitiveMemory || !this.memoryInitialized || !this.config.enableCognitiveMemory) {
+      return;
+    }
+
+    try {
+      // 1. Guardar la consulta del usuario
+      await this.cognitiveMemory.remember(query, {
+        type: 'context',
+        source: 'user',
+        sessionId,
+        importance: 2,
+        tags: ['query', type]
+      });
+
+      // 2. Guardar la respuesta (si existe)
+      if (plan?.steps && plan.steps.length > 0) {
+        const response = plan.steps
+          .filter(s => s.output)
+          .map(s => s.output)
+          .join('\n');
+        
+        if (response) {
+          await this.cognitiveMemory.remember(response.substring(0, 500), {
+            type: 'context',
+            source: 'system',
+            sessionId,
+            importance: 2,
+            tags: ['response', type]
+          });
+        }
+      }
+
+      // 3. Extraer y guardar hechos de la consulta
+      try {
+        const facts = await this.cognitiveMemory.extractFacts(query);
+        for (const fact of facts) {
+          await this.cognitiveMemory.remember(
+            {
+              key: fact.key,
+              value: fact.value
+            },
+            {
+              type: fact.type,
+              source: 'user',
+              sessionId,
+              importance: fact.importance || 3,
+              tags: [fact.type, 'extracted']
+            }
+          );
+        }
+      } catch (extractError) {
+        // Ignorar errores de extracción
+      }
+
+      // 4. Si la consulta es arquitectónica, guardar como conocimiento del proyecto
+      if (this._isArchitectureQuery(query) && plan?.metadata?.type === 'architecture') {
+        await this.cognitiveMemory.remember(
+          `Arquitectura: ${query.substring(0, 200)}`,
+          {
+            type: 'project_knowledge',
+            source: 'system',
+            sessionId,
+            importance: 5,
+            tags: ['architecture', 'project', 'knowledge']
+          }
+        );
+      }
+
+    } catch (error) {
+      logger.warn('[ReasoningService] Error guardando en memoria', {
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Obtiene contexto de memoria para una sesión
+   * @public
+   */
+  async getMemoryContext(sessionId, limit = 10) {
+    if (!this.cognitiveMemory || !this.memoryInitialized) {
+      return { memories: [], context: '' };
+    }
+
+    try {
+      const memories = await this.cognitiveMemory.getContext(sessionId, limit);
+      const context = this.cognitiveMemory.summarizer?.summarizeContext(memories) || '';
+      return { memories, context };
+    } catch (error) {
+      logger.warn('[ReasoningService] Error obteniendo contexto de memoria', {
+        error: error.message
+      });
+      return { memories: [], context: '' };
+    }
+  }
+
+  /**
+   * Genera resumen de una conversación
+   * @public
+   */
+  async summarizeConversation(sessionId) {
+    if (!this.cognitiveMemory || !this.memoryInitialized) {
+      return null;
+    }
+
+    try {
+      return await this.cognitiveMemory.summarizeConversation(sessionId);
+    } catch (error) {
+      logger.warn('[ReasoningService] Error generando resumen', {
+        error: error.message
+      });
+      return null;
+    }
+  }
+
+  // ─── ENRIQUECIMIENTO DE CONTEXTO ──────────────────────────
+
+  /**
+   * Enriquece el contexto con conocimiento del sistema y memoria
+   * @private
+   */
+  async _enrichWithKnowledge(query, context, windowResult, memoryContext, memories) {
+    const enriched = {
+      ...context,
+      ...windowResult,
+      knowledgeUsed: false,
+      systemContext: null,
+      memoryContext: memoryContext || '',
+      memories: memories || []
+    };
+
+    if (!this.knowledge || !this.queryPlanner) {
+      return enriched;
+    }
+
+    try {
+      // Extraer entidades de la consulta
+      const entities = this._extractEntitiesFromQuery(query);
+      
+      if (entities.components.length > 0 || entities.methods.length > 0) {
+        const componentInfo = [];
+        
+        for (const comp of entities.components) {
+          try {
+            // ✅ Usar contractService desde queryPlanner
+            const contract = this.queryPlanner.contractService?.getContract(comp);
+            if (contract && contract.exists) {
+              componentInfo.push({
+                name: comp,
+                methods: contract.publicMethods?.length || 0,
+                type: contract.type || 'unknown'
+              });
+            }
+          } catch (e) {
+            // Ignorar errores de componentes individuales
+          }
+        }
+
+        enriched.systemContext = {
+          mentionedComponents: componentInfo,
+          methodsMentioned: entities.methods,
+          hasSystemContext: componentInfo.length > 0
+        };
+        enriched.knowledgeUsed = componentInfo.length > 0;
+      }
+
+      // Si la consulta menciona métodos, buscar información adicional
+      if (entities.methods.length > 0) {
+        const methodInfo = [];
+        for (const method of entities.methods) {
+          try {
+            const result = this.queryPlanner.methodResolver?.findByName(method);
+            if (result && result.success && result.data?.count > 0) {
+              methodInfo.push({
+                name: method,
+                components: result.data.components?.map(c => c.name) || [],
+                count: result.data.count || 0
+              });
+            }
+          } catch (e) {
+            // Ignorar errores de métodos individuales
+          }
+        }
+        
+        if (methodInfo.length > 0) {
+          if (!enriched.systemContext) {
+            enriched.systemContext = {};
+          }
+          enriched.systemContext.methodInfo = methodInfo;
+          enriched.knowledgeUsed = true;
+        }
+      }
+
+      // Si hay memoria, agregarla al contexto
+      if (memoryContext && memories.length > 0) {
+        enriched.memoryContext = memoryContext;
+        enriched.memories = memories;
+        enriched.hasMemory = true;
+      }
+
+      return enriched;
+
+    } catch (error) {
+      logger.warn('[ReasoningService] Error enriqueciendo contexto', {
+        error: error.message
+      });
+      return enriched;
+    }
+  }
+
+  /**
+   * Extrae entidades de una consulta
+   * @private
+   */
+  _extractEntitiesFromQuery(query) {
+    const entities = {
+      components: [],
+      methods: []
+    };
+
+    if (!query || typeof query !== 'string') return entities;
+
+    // Extraer componentes conocidos
+    if (this.queryPlanner) {
+      try {
+        const contracts = this.queryPlanner.contractService?.getAllContracts?.() || {};
+        const componentNames = Object.keys(contracts);
+        
+        for (const name of componentNames) {
+          if (query.toLowerCase().includes(name.toLowerCase())) {
+            entities.components.push(name);
+          }
+        }
+      } catch (e) {
+        // Ignorar errores
+      }
+    }
+
+    // Extraer métodos (patrón: X() o "método X")
+    const methodPatterns = [
+      /(?:método|función|method)\s+([a-zA-Z_$][\w$]*)/i,
+      /([a-zA-Z_$][\w$]*)\s*\(\)/i
+    ];
+    
+    for (const pattern of methodPatterns) {
+      const match = query.match(pattern);
+      if (match && match[1]) {
+        const methodName = match[1];
+        if (!entities.components.includes(methodName)) {
+          entities.methods.push(methodName);
+        }
+      }
+    }
+
+    return entities;
+  }
+
+  // ─── GENERACIÓN DE PLANES ──────────────────────────────────
+
+  /**
+   * Genera plan con conocimiento de arquitectura y memoria
+   * @private
+   */
+  async _generatePlanWithKnowledge(query, enrichedContext, sessionId, memories = []) {
+    // Construir system prompt con conocimiento del sistema y memoria
+    const systemPrompt = this._buildSystemPromptWithKnowledge(query, enrichedContext);
+
+    // Usar AI para generar el plan
+    try {
+      if (!this.aiProvider || typeof this.aiProvider.chat !== 'function') {
+        throw new Error('AI Provider no disponible');
+      }
+
+      const messages = [
+        { role: 'system', content: systemPrompt }
+      ];
+
+      // Agregar contexto de memoria si existe
+      if (enrichedContext.memoryContext && memories.length > 0) {
+        messages.push({
+          role: 'system',
+          content: `## INFORMACIÓN RECORDADA\n\n${enrichedContext.memoryContext}`
+        });
+      }
+
+      // Agregar query del usuario
+      messages.push({ role: 'user', content: query });
+
+      const response = await this.aiProvider.chat({
+        messages,
+        sessionId,
+        temperature: 0.3,
+        maxTokens: 2000
+      });
+
+      return this._parsePlan(response, enrichedContext);
+    } catch (error) {
+      logger.error('[ReasoningService] Error generando plan con IA', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Construye system prompt con conocimiento del sistema y memoria
+   * @private
+   */
+  _buildSystemPromptWithKnowledge(query, enrichedContext) {
+    let prompt = `Eres JARVIS, un asistente cognitivo para Instagram Marketing.
+
+Eres capaz de recordar información entre conversaciones y sesiones.
+
+`;
+
+    // Agregar información de memoria si está disponible
+    if (enrichedContext.hasMemory && enrichedContext.memoryContext) {
+      prompt += `## LO QUE RECUERDAS DE CONVERSACIONES ANTERIORES\n\n`;
+      prompt += enrichedContext.memoryContext;
+      prompt += '\n\n';
+    }
+
+    // Agregar información del sistema si está disponible
+    if (enrichedContext.systemContext && enrichedContext.systemContext.hasSystemContext) {
+      prompt += `## CONOCIMIENTO DEL SISTEMA\n\n`;
+      
+      if (enrichedContext.systemContext.mentionedComponents.length > 0) {
+        prompt += `Componentes mencionados en la consulta:\n`;
+        for (const comp of enrichedContext.systemContext.mentionedComponents) {
+          prompt += `- ${comp.name} (${comp.type}, ${comp.methods} métodos)\n`;
+        }
+        prompt += '\n';
+      }
+
+      if (enrichedContext.systemContext.methodInfo && enrichedContext.systemContext.methodInfo.length > 0) {
+        prompt += `Métodos mencionados:\n`;
+        for (const info of enrichedContext.systemContext.methodInfo) {
+          prompt += `- ${info.name}: disponible en ${info.components.join(', ')}\n`;
+        }
+        prompt += '\n';
+      }
+    }
+
+    prompt += `## INSTRUCCIONES\n\n`;
+    prompt += `Responde a la consulta del usuario de manera clara y útil.\n`;
+    prompt += `Si la consulta es sobre el sistema (arquitectura, dependencias, métodos), usa el conocimiento proporcionado.\n`;
+    prompt += `Si recuerdas información relevante de conversaciones anteriores, úsala para enriquecer tu respuesta.\n`;
+    prompt += `Sé preciso y basado en la información disponible.\n`;
+    prompt += `Estructura tu respuesta en pasos claros y accionables.\n`;
+    prompt += `Siempre devuelve un plan estructurado con pasos específicos.\n`;
+    prompt += `Si no sabes algo, dilo honestamente.\n`;
+
+    return prompt;
+  }
+
+  // ─── VALIDACIÓN Y ANÁLISIS ─────────────────────────────────
+
+  /**
+   * Valida un plan generado
+   * @private
+   */
+  _validatePlan(plan) {
+    if (!plan) {
+      return {
+        steps: [],
+        metadata: {
+          error: 'Plan vacío'
+        }
+      };
+    }
+
+    // Asegurar que tiene steps
+    if (!plan.steps || !Array.isArray(plan.steps)) {
+      plan.steps = [];
+    }
+
+    // Validar cada paso
+    for (const step of plan.steps) {
+      if (!step.id) {
+        step.id = `step_${Math.random().toString(36).substring(7)}`;
+      }
+      if (!step.type) {
+        step.type = 'action';
+      }
+    }
+
+    return plan;
+  }
+
+  /**
+   * Clasifica la confianza del plan
+   * @private
+   */
+  _classifyConfidence(plan, context) {
+    if (!plan) return 0;
+
+    // Si es consulta de arquitectura, confianza alta
+    if (plan.metadata?.type === 'architecture') {
+      return 0.95;
+    }
+
+    let confidence = 0.5;
+
+    // Basado en pasos del plan
+    if (plan.steps && plan.steps.length > 0) {
+      confidence += 0.2;
+    }
+
+    // Basado en contexto
+    if (context && context.metadata?.sourcesUsed?.length > 0) {
+      confidence += 0.1;
+    }
+
+    // Basado en metadata del plan
+    if (plan.metadata?.confidence) {
+      confidence = Math.max(confidence, plan.metadata.confidence);
+    }
+
+    return Math.min(confidence, 0.95);
+  }
+
+  /**
+   * Valida el impacto del contexto
+   * @private
+   */
+  _validateContextImpact(context) {
+    return {
+      relevantSources: context.metadata?.sourcesUsed || [],
+      baseSources: context.metadata?.baseSources || [],
+      allSources: context.metadata?.allSources || [],
+      hasRelevantContext: (context.metadata?.sourcesUsed?.length || 0) > 0
+    };
+  }
+
+  /**
+   * Parsea la respuesta de la IA en un plan estructurado
+   * @private
+   */
+  _parsePlan(response, context) {
+    let plan = {
+      steps: [],
+      metadata: {}
+    };
+
+    try {
+      if (typeof response === 'string') {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.steps) {
+            plan = parsed;
+          }
+        } else {
+          plan.steps = [
+            {
+              id: 'response',
+              type: 'action',
+              description: 'Respuesta generada',
+              action: 'respond',
+              input: { response },
+              output: response
+            }
+          ];
+        }
+      } else if (typeof response === 'object' && response !== null) {
+        plan = response;
+      }
+    } catch (error) {
+      plan.steps = [
+        {
+          id: 'response',
+          type: 'action',
+          description: 'Respuesta generada',
+          action: 'respond',
+          input: { response: String(response) },
+          output: String(response)
+        }
+      ];
+    }
+
+    if (!plan.steps) {
+      plan.steps = [];
+    }
+    if (!plan.metadata) {
+      plan.metadata = {};
+    }
+
+    return plan;
+  }
+
+  // ─── MÉTRICAS Y ESTADO ──────────────────────────────────────
+
+  getMetrics() {
+    return {
+      name: this.name,
+      status: this.status,
+      initialized: this.initialized,
+      architectureAware: true,
+      queryPlannerAvailable: !!this.queryPlanner,
+      knowledgeAvailable: !!this.knowledge,
+      memoryAvailable: this.memoryInitialized,
+      memoryEnabled: this.config.enableCognitiveMemory,
+      config: {
+        maxSteps: this.config.maxSteps,
+        minConfidence: this.config.minConfidence,
+        maxTokens: this.config.maxTokens,
+        maxMemoriesPerQuery: this.config.maxMemoriesPerQuery,
+        minMemoryImportance: this.config.minMemoryImportance
+      }
+    };
+  }
+
+  getStatus() {
+    return {
+      name: this.name,
+      status: this.status,
+      initialized: this.initialized,
+      memoryInitialized: this.memoryInitialized,
+      metrics: this.getMetrics()
+    };
+  }
+
+  async shutdown() {
+    try {
+      // Cerrar memoria cognitiva si está inicializada
+      if (this.cognitiveMemory && this.memoryInitialized) {
+        try {
+          await this.cognitiveMemory.cleanup?.();
+        } catch (memoryError) {
+          logger.warn('[ReasoningService] Error en cleanup de memoria', {
+            error: memoryError.message
+          });
+        }
+      }
+
+      this.status = 'offline';
+      this.initialized = false;
+      this.memoryInitialized = false;
+      
+      logger.info('[ReasoningService] Apagado correctamente');
+      return true;
+    } catch (error) {
+      logger.error('[ReasoningService] Error en shutdown', {
+        error: error.message
+      });
+      return false;
+    }
+  }
+}
+
+// ─── INSTANCIA POR DEFECTO ──────────────────────────────────
+
+// Crear instancia por defecto para exportación
+const defaultReasoningService = new ReasoningService({
+  queryPlanner: null,
+  knowledgeService: null,
+  aiProvider: null,
+  contextService: null,
+  contextWindowManager: null,
+  cognitiveMemoryService: null,
+  config: {}
+});
+
+// Exportar la instancia por defecto y la clase
+export default defaultReasoningService;

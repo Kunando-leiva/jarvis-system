@@ -1,0 +1,372 @@
+/* frontend/css/voice-panel.css */
+/* 🎛️ Panel de control de voz - Estilos */
+
+.voice-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90%, 480px);
+  max-height: 90vh;
+  background: rgba(10, 15, 30, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 16px;
+  padding: 24px 28px;
+  z-index: 9999;
+  display: none;
+  overflow-y: auto;
+  box-shadow: 0 8px 60px rgba(0, 0, 0, 0.8);
+  color: #e8edf5;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.voice-panel.show {
+  display: block;
+  animation: fadeInUp 0.3s ease;
+}
+
+.voice-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.voice-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.3);
+  border-radius: 2px;
+}
+
+/* ─── HEADER ────────────────────────────────────────────── */
+.voice-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.voice-panel-header h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #00e5ff;
+  letter-spacing: 1px;
+}
+
+.voice-panel-header .close-btn {
+  background: rgba(255, 60, 60, 0.15);
+  border: 1px solid rgba(255, 60, 60, 0.2);
+  color: #ff6b6b;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: all 0.2s;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.voice-panel-header .close-btn:hover {
+  background: rgba(255, 60, 60, 0.25);
+}
+
+/* ─── SECCIÓN DE SELECCIÓN DE VOZ ────────────────────── */
+.voice-section {
+  margin-bottom: 18px;
+}
+
+.voice-section label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8892a8;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.voice-section select {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #e8edf5;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Rajdhani', sans-serif;
+  transition: border-color 0.3s;
+}
+
+.voice-section select:focus {
+  border-color: #00e5ff;
+}
+
+.voice-section select option {
+  background: #0a0f1e;
+  color: #e8edf5;
+}
+
+/* ─── SLIDERS ──────────────────────────────────────────── */
+.slider-group {
+  margin-bottom: 16px;
+}
+
+.slider-group .slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.slider-group .slider-header label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8892a8;
+  font-weight: 600;
+}
+
+.slider-group .slider-header .value-display {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  color: #00e5ff;
+  min-width: 40px;
+  text-align: right;
+}
+
+.slider-group input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  outline: none;
+  transition: background 0.3s;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #00e5ff;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+  transition: all 0.2s;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+}
+
+.slider-group input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: #00e5ff;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+}
+
+/* ─── PRESETS ───────────────────────────────────────────── */
+.preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.preset-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  color: #8892a8;
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s;
+}
+
+.preset-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.preset-btn.active {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+
+/* ─── BOTONES DE ACCIÓN ───────────────────────────────── */
+.voice-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.voice-actions button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.voice-actions .btn-test {
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  color: #00e5ff;
+}
+
+.voice-actions .btn-test:hover {
+  background: rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.15);
+}
+
+.voice-actions .btn-apply {
+  background: #00e5ff;
+  color: #0a0f1e;
+}
+
+.voice-actions .btn-apply:hover {
+  opacity: 0.85;
+  transform: scale(1.02);
+}
+
+/* ─── INDICADORES ───────────────────────────────────────── */
+.voice-indicators {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.voice-indicator {
+  text-align: center;
+}
+
+.voice-indicator .indicator-label {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  color: #6a7a8a;
+  letter-spacing: 0.5px;
+}
+
+.voice-indicator .indicator-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  color: #00e5ff;
+}
+
+/* ─── ESTADO DE VOZ ────────────────────────────────────── */
+.voice-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.voice-status-bar .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  transition: all 0.3s;
+}
+
+.voice-status-bar .status-dot.active {
+  background: #00c853;
+  box-shadow: 0 0 15px rgba(0, 200, 83, 0.3);
+}
+
+.voice-status-bar .status-text {
+  font-size: 0.7rem;
+  color: #8892a8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.voice-status-bar .status-voice {
+  margin-left: auto;
+  font-size: 0.6rem;
+  color: #6a7a8a;
+  font-family: 'Orbitron', monospace;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── ANIMACIONES ───────────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ─── RESPONSIVE ────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .voice-panel {
+    padding: 18px 16px;
+    width: 95%;
+  }
+  
+  .voice-actions {
+    grid-template-columns: 1fr;
+  }
+  
+  .preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .voice-indicators {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 400px) {
+  .voice-panel {
+    padding: 14px 12px;
+    top: 10%;
+    transform: translate(-50%, 0);
+    max-height: 90vh;
+  }
+  
+  .voice-panel.show {
+    animation: fadeInUp 0.3s ease;
+  }
+  
+  .voice-indicators {
+    grid-template-columns: 1fr;
+  }
+}

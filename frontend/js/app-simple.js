@@ -1,6 +1,8 @@
 // frontend/js/app-simple.js
 // 🎯 CON SESIÓN PERSISTENTE - RECUERDA LA CONVERSACIÓN
 
+import { voiceManager } from './modules/voice.js';
+
 (function() {
   'use strict';
 
@@ -23,6 +25,88 @@
 
   const SESSION_ID = initSession();
 
+
+// frontend/js/app-simple.js
+// AGREGAR DESPUÉS DE initSession()
+
+// ============================================================
+// 🧠 userId PERSISTENTE
+// ============================================================
+function initUserId() {
+  let userId = localStorage.getItem('jarvis_user_id');
+  if (!userId) {
+    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem('jarvis_user_id', userId);
+    console.log('[JARVIS] 🆔 Nuevo userId creado:', userId);
+  } else {
+    console.log('[JARVIS] 🆔 userId restaurado:', userId);
+  }
+  return userId;
+}
+
+const USER_ID = initUserId();
+
+// ============================================================
+// 🧠 COGNITIVE MEMORY - FUNCIONES
+// ============================================================
+
+async function saveToCognitiveMemory(text, type = 'user') {
+  try {
+    const response = await fetch('/api/memory/cognitive/extract-and-save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: text,
+        userId: USER_ID,
+        sessionId: SESSION_ID,
+        tags: [type, 'chat']
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.count > 0) {
+      console.log(`[CognitiveMemory] ✅ ${result.count} hechos extraídos:`, 
+        result.facts.map(f => `${f.type}: ${f.metadata?.value || f.content}`).join(', ')
+      );
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('[CognitiveMemory] Error guardando:', error);
+    return null;
+  }
+}
+
+async function loadPersonalInfo() {
+  try {
+    const response = await fetch(`/api/memory/cognitive/personal-info?userId=${USER_ID}`);
+    const result = await response.json();
+    
+    if (result.success && result.info && Object.keys(result.info).length > 0) {
+      const infoSummary = Object.entries(result.info)
+        .map(([key, value]) => {
+          const displayKey = key.replace(/_/g, ' ');
+          return `• ${displayKey}: ${value}`;
+        })
+        .join('\n');
+      
+      setTimeout(() => {
+        displayMessage(
+          `🧠 **JARVIS recuerda de ti:**\n\n${infoSummary}\n\n💡 Puedes preguntarme "¿Cómo me llamo?" o "¿Cuál es mi color favorito?"`,
+          'system'
+        );
+      }, 1000);
+      
+      console.log('[CognitiveMemory] 📖 Información personal cargada:', result.info);
+    }
+  } catch (error) {
+    console.error('[CognitiveMemory] Error cargando info personal:', error);
+  }
+}
+
   // ============================================================
   // VARIABLES GLOBALES
   // ============================================================
@@ -33,9 +117,10 @@
   let targetScale = 1.0;
   let currentScale = 1.0;
   let socket = null;
+  let isVoiceEnabled = false;
 
   // ============================================================
-  // VISUALIZADOR 3D - ESFERA LIMPIA
+  // VISUALIZADOR 3D
   // ============================================================
   function initVisualizer() {
     const canvas = document.getElementById('sphere');
@@ -46,16 +131,13 @@
 
     console.log('[Visualizer] Inicializando esfera 3D...');
 
-    // ESCENA
     scene = new THREE.Scene();
     scene.background = null;
 
-    // CÁMARA
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0, 4.5);
     camera.lookAt(0, 0, 0);
 
-    // RENDERER
     renderer = new THREE.WebGLRenderer({
       canvas: canvas,
       antialias: true,
@@ -67,9 +149,6 @@
 
     console.log('[Visualizer] Renderer creado');
 
-    // ============================================================
-    // ESFERA PRINCIPAL - LIMPIA
-    // ============================================================
     const geometry = new THREE.SphereGeometry(1.2, 64, 64);
     sphereMaterial = new THREE.MeshPhongMaterial({
       color: 0x00e5ff,
@@ -85,11 +164,6 @@
     sphere.position.set(0, 0, 0);
     scene.add(sphere);
 
-    console.log('[Visualizer] Esfera creada');
-
-    // ============================================================
-    // ESFERA INTERIOR - SÓLIDA CON BRILLO
-    // ============================================================
     const innerGeom = new THREE.SphereGeometry(0.5, 32, 32);
     const innerMat = new THREE.MeshPhongMaterial({
       color: 0x00e5ff,
@@ -103,9 +177,6 @@
     innerSphere.position.set(0, 0, 0);
     scene.add(innerSphere);
 
-    // ============================================================
-    // ANILLO DECORATIVO
-    // ============================================================
     const ringGeom = new THREE.TorusGeometry(1.6, 0.015, 16, 100);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
@@ -116,9 +187,6 @@
     ring.rotation.x = Math.PI / 2;
     scene.add(ring);
 
-    // ============================================================
-    // LUCES
-    // ============================================================
     const light1 = new THREE.DirectionalLight(0xff4444, 0.8);
     light1.position.set(2, 2, 2);
     scene.add(light1);
@@ -136,91 +204,18 @@
 
     console.log('[Visualizer] Luces creadas');
 
-    // ============================================================
-    // MICRÓFONO
-    // ============================================================
-    function initAudio() {
-      try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 128;
-        
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then((stream) => {
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-            isAudioInitialized = true;
-            console.log('[Visualizer] 🎤 Micrófono conectado!');
-          })
-          .catch((err) => {
-            console.warn('[Visualizer] ⚠️ No se pudo acceder al micrófono:', err.message);
-          });
-      } catch (e) {
-        console.warn('[Visualizer] ⚠️ AudioContext no soportado.');
-      }
-    }
-
-    const micBtn = document.getElementById('mic-btn');
-    if (micBtn) {
-      micBtn.addEventListener('click', function() {
-        if (!isAudioInitialized) {
-          initAudio();
-          console.log('[Visualizer] Audio inicializado por clic');
-        }
-        if (window._recognition && !this.classList.contains('listening')) {
-          this.classList.add('listening');
-          window._recognition.start();
-        }
-      });
-    }
-
-    // ============================================================
-    // BUCLE DE ANIMACIÓN
-    // ============================================================
     function animate() {
       requestAnimationFrame(animate);
 
-      // Rotación suave de la esfera
       if (sphere) {
         sphere.rotation.x += 0.003;
         sphere.rotation.y += 0.005;
       }
 
-      // Rotación del anillo
       if (ring) {
         ring.rotation.z += 0.002;
       }
 
-      // ============================================================
-      // REACCIÓN AL MICRÓFONO
-      // ============================================================
-      if (isAudioInitialized && analyser) {
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-        
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const average = sum / dataArray.length;
-
-        if (average > 5) {
-          targetScale = 1.0 + (average / 255) * 0.5;
-          const hue = 0.6 - (average / 255) * 0.5;
-          if (sphereMaterial) {
-            sphereMaterial.color.setHSL(Math.max(0, Math.min(1, hue)), 1, 0.5);
-            sphereMaterial.emissive.setHSL(Math.max(0, Math.min(1, hue)), 1, 0.5);
-            sphereMaterial.emissiveIntensity = 0.5 + (average / 255) * 0.8;
-          }
-        } else {
-          targetScale = 1.0;
-          if (sphereMaterial) {
-            sphereMaterial.color.setHex(0x00e5ff);
-            sphereMaterial.emissive.setHex(0x00e5ff);
-            sphereMaterial.emissiveIntensity = 0.3;
-          }
-        }
-      }
-
-      // Suavizar la escala (interpolación)
       currentScale += (targetScale - currentScale) * 0.08;
       if (sphere) {
         sphere.scale.set(currentScale, currentScale, currentScale);
@@ -231,7 +226,6 @@
 
     animate();
 
-    // REDIMENSIONAR
     window.addEventListener('resize', () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -295,22 +289,38 @@
     while (container.children.length > 50) {
       container.removeChild(container.children[0]);
     }
+
+    // 🔥 LEER EN VOZ ALTA
+    if (isVoiceEnabled && role !== 'user' && text && text.length > 5) {
+      voiceManager.speak(text, {
+        rate: 1.12,
+        pitch: 1.14
+      });
+    }
   }
 
-  function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const text = input.value.trim();
-    if (!text) return;
-    
-    displayMessage(text, 'user');
-    
-    if (socket) {
-      // 🔥 ENVIAR EL SESSION ID PERSISTENTE
-      socket.emit('user-message', text, { sessionId: SESSION_ID });
-    }
-    
-    input.value = '';
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  
+  displayMessage(text, 'user');
+  
+  // ✅ GUARDAR EN COGNITIVE MEMORY
+  saveToCognitiveMemory(text, 'user');
+  
+  if (socket) {
+    // ✅ ENVIAR OBJETO CON userId Y sessionId
+    socket.emit('user-message', {
+      message: text,
+      userId: USER_ID,
+      sessionId: SESSION_ID
+    });
   }
+  
+  input.value = '';
+}
 
   // ============================================================
   // SOCKET
@@ -321,10 +331,25 @@
     socket = io('http://localhost:5000');
     
     socket.on('connect', function() {
-      console.log('✅ Socket conectado');
-      document.getElementById('status-label').textContent = 'JARVIS · ONLINE';
-      document.getElementById('status-label').style.color = '#00e5ff';
-    });
+  console.log('✅ Socket conectado');
+  
+  // ✅ IDENTIFICARSE CON userId Y sessionId
+  socket.emit('identify', {
+    userId: USER_ID,
+    sessionId: SESSION_ID
+  });
+  
+  document.getElementById('status-label').textContent = 'JARVIS · ONLINE';
+  document.getElementById('status-label').style.color = '#00e5ff';
+});
+
+// ✅ RECIBIR CONFIRMACIÓN DE IDENTIFICACIÓN
+socket.on('identified', function(data) {
+  console.log('[Socket] ✅ Identificado:', data);
+  if (data.cognitiveMemoryAvailable) {
+    console.log('[Socket] 🧠 CognitiveMemory disponible');
+  }
+});
     
     socket.on('disconnect', function() {
       console.log('❌ Socket desconectado');
@@ -332,23 +357,32 @@
       document.getElementById('status-label').style.color = '#ff6b6b';
     });
     
-    socket.on('ai-response', function(data) {
-      if (data.text) {
-        const provider = data.provider?.toUpperCase() || data.mode || 'SISTEMA';
-        displayMessage(data.text, provider.toLowerCase());
-        
-        // 🔥 PULSO VISUAL CUANDO JARVIS HABLA
-        if (sphereMaterial) {
-          sphereMaterial.color.setHex(0x00e5ff);
-          sphereMaterial.emissiveIntensity = 0.8;
-          targetScale = 1.3;
-          setTimeout(() => {
-            targetScale = 1.0;
-            sphereMaterial.emissiveIntensity = 0.3;
-          }, 800);
-        }
-      }
-    });
+    // frontend/js/app-simple.js
+// DENTRO DE connectSocket(), socket.on('ai-response')
+
+socket.on('ai-response', function(data) {
+  if (data.text) {
+    const provider = data.provider?.toUpperCase() || data.mode || 'SISTEMA';
+    const role = provider.toLowerCase();
+    
+    displayMessage(data.text, role);
+    
+    // ✅ GUARDAR RESPUESTA EN COGNITIVE MEMORY
+    if (role !== 'system' && data.text.length > 10) {
+      saveToCognitiveMemory(data.text, 'response');
+    }
+    
+    if (sphereMaterial) {
+      sphereMaterial.color.setHex(0x00e5ff);
+      sphereMaterial.emissiveIntensity = 0.8;
+      targetScale = 1.3;
+      setTimeout(() => {
+        targetScale = 1.0;
+        sphereMaterial.emissiveIntensity = 0.3;
+      }, 800);
+    }
+  }
+});
     
     socket.on('state-change', function(data) {
       if (data.mode) {
@@ -359,7 +393,7 @@
   }
 
   // ============================================================
-  // MICRÓFONO - RECONOCIMIENTO DE VOZ
+  // MICRÓFONO
   // ============================================================
   function setupMicrophone() {
     const micBtn = document.getElementById('mic-btn');
@@ -391,6 +425,34 @@
       recognition.onend = function() {
         micBtn.classList.remove('listening');
       };
+      
+      micBtn.addEventListener('click', function() {
+        if (!isAudioInitialized) {
+          try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 128;
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+              .then((stream) => {
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                isAudioInitialized = true;
+                console.log('[Visualizer] 🎤 Micrófono conectado!');
+              })
+              .catch((err) => {
+                console.warn('[Visualizer] ⚠️ No se pudo acceder al micrófono:', err.message);
+              });
+          } catch (e) {
+            console.warn('[Visualizer] ⚠️ AudioContext no soportado.');
+          }
+        }
+        
+        if (window._recognition && !this.classList.contains('listening')) {
+          this.classList.add('listening');
+          window._recognition.start();
+        }
+      });
     } else {
       micBtn.style.opacity = '0.3';
       micBtn.title = 'Micrófono no soportado';
@@ -407,8 +469,6 @@
     const convertBtn = document.getElementById('convert-drive-btn');
     const addRespuestaBtn = document.getElementById('add-respuesta-btn');
     const respuestasContainer = document.getElementById('respuestas-container');
-
-    let convertedUrl = '';
 
     if (toggleBtn && section) {
       toggleBtn.addEventListener('click', function() {
@@ -459,7 +519,7 @@
           return;
         }
         const fileId = match[1];
-        convertedUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
+        const convertedUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
         console.log('[Drive] URL convertida:', convertedUrl);
 
         const titulo = document.getElementById('post-titulo').value.trim();
@@ -578,25 +638,295 @@
   }
 
   // ============================================================
+  // CONTROLES DE VOZ
+  // ============================================================
+  function setupVoiceControls() {
+    voiceManager.init('es-ES');
+    
+    // ─── BOTÓN DE VOZ ──────────────────────────────────────
+    const bottomBar = document.getElementById('bottom-bar');
+    if (bottomBar) {
+      const voiceBtn = document.createElement('button');
+      voiceBtn.id = 'voice-toggle-btn';
+      voiceBtn.innerHTML = '🔇';
+      voiceBtn.title = 'Activar voz de JARVIS';
+      voiceBtn.style.cssText = `
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #c9d1e0;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        opacity: 0.5;
+      `;
+      
+      voiceBtn.addEventListener('click', () => {
+        isVoiceEnabled = !isVoiceEnabled;
+        voiceManager.toggle(isVoiceEnabled);
+        
+        if (isVoiceEnabled) {
+          voiceBtn.innerHTML = '🔊';
+          voiceBtn.style.opacity = '1';
+          voiceBtn.style.borderColor = '#00e5ff';
+          voiceBtn.style.color = '#00e5ff';
+          voiceBtn.title = 'Desactivar voz';
+          
+          const statusLabel = document.getElementById('status-label');
+          if (statusLabel) {
+            const originalText = statusLabel.textContent;
+            statusLabel.textContent = '🔊 VOZ ACTIVADA';
+            statusLabel.style.color = '#00e5ff';
+            setTimeout(() => {
+              statusLabel.textContent = originalText;
+              statusLabel.style.color = '';
+            }, 1500);
+          }
+        } else {
+          voiceBtn.innerHTML = '🔇';
+          voiceBtn.style.opacity = '0.5';
+          voiceBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          voiceBtn.style.color = '#c9d1e0';
+          voiceBtn.title = 'Activar voz';
+        }
+      });
+      
+      const driveBtn = document.getElementById('drive-toggle-btn');
+      if (driveBtn) {
+        driveBtn.parentNode.insertBefore(voiceBtn, driveBtn.nextSibling);
+      } else {
+        bottomBar.appendChild(voiceBtn);
+      }
+      
+      console.log('[Voice] ✅ Botón de voz agregado');
+    }
+    
+    // ─── BOTÓN PANEL DE VOZ ──────────────────────────────
+    const voicePanelBtn = document.getElementById('voice-panel-btn');
+    if (voicePanelBtn) {
+      voicePanelBtn.addEventListener('click', () => {
+        window.openVoicePanel();
+      });
+      console.log('[Voice] ✅ Botón de panel de voz agregado');
+    }
+
+    // ─── COMANDOS ──────────────────────────────────────────
+    const originalHandleCommand = window.handleCommand;
+    window.handleCommand = function(text) {
+      const lower = text.toLowerCase().trim();
+      
+      if (lower === '/voice') {
+        const voiceBtn = document.getElementById('voice-toggle-btn');
+        if (voiceBtn) voiceBtn.click();
+        return true;
+      }
+      
+      if (lower === '/voicestatus') {
+        const status = voiceManager.getStatus();
+        displayMessage(
+          `🔊 **Estado de voz**\n\n` +
+          `- Activada: ${status.enabled ? '✅ Sí' : '❌ No'}\n` +
+          `- Voz actual: ${status.voice || 'No disponible'}\n` +
+          `- Velocidad: ${status.rate}\n` +
+          `- Tono: ${status.pitch}\n` +
+          `- Voces disponibles: ${status.voicesCount}`,
+          'system'
+        );
+        return true;
+      }
+      
+      if (lower === '/voicepanel') {
+        window.openVoicePanel();
+        return true;
+      }
+      
+      if (typeof originalHandleCommand === 'function') {
+        return originalHandleCommand(text);
+      }
+      return false;
+    };
+  }
+
+  // ============================================================
+  // PANEL DE VOZ
+  // ============================================================
+  window.openVoicePanel = function() {
+    const panel = document.getElementById('voice-panel');
+    if (panel) {
+      panel.classList.add('show');
+      updateVoicePanel();
+    }
+  };
+
+  window.closeVoicePanel = function() {
+    const panel = document.getElementById('voice-panel');
+    if (panel) {
+      panel.classList.remove('show');
+    }
+  };
+
+  function updateVoicePanel() {
+    const status = voiceManager.getStatus();
+    
+    const select = document.getElementById('voice-select');
+    if (select) {
+      const voices = voiceManager.getVoices();
+      const currentVoice = status.voice;
+      
+      select.innerHTML = '';
+      voices.forEach((v, i) => {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = `${v.name} (${v.lang})`;
+        if (v.name === currentVoice) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      });
+      
+      document.getElementById('indicator-voices').textContent = voices.length;
+    }
+    
+    document.getElementById('rate-slider').value = status.rate;
+    document.getElementById('pitch-slider').value = status.pitch;
+    document.getElementById('rate-value').textContent = status.rate.toFixed(2);
+    document.getElementById('pitch-value').textContent = status.pitch.toFixed(2);
+    document.getElementById('indicator-rate').textContent = status.rate.toFixed(2);
+    document.getElementById('indicator-pitch').textContent = status.pitch.toFixed(2);
+    
+    const dot = document.getElementById('voice-status-dot');
+    const text = document.getElementById('voice-status-text');
+    const voiceName = document.getElementById('voice-status-voice');
+    
+    if (status.enabled) {
+      dot.className = 'status-dot active';
+      text.textContent = 'Activada';
+      text.style.color = '#00c853';
+    } else {
+      dot.className = 'status-dot';
+      text.textContent = 'Desactivada';
+      text.style.color = '#ff6b6b';
+    }
+    
+    voiceName.textContent = status.voice || 'Sin voz seleccionada';
+  }
+
+  window.applyPreset = function(btn) {
+    const rate = parseFloat(btn.dataset.rate);
+    const pitch = parseFloat(btn.dataset.pitch);
+    
+    document.getElementById('rate-slider').value = rate;
+    document.getElementById('pitch-slider').value = pitch;
+    document.getElementById('rate-value').textContent = rate.toFixed(2);
+    document.getElementById('pitch-value').textContent = pitch.toFixed(2);
+    document.getElementById('indicator-rate').textContent = rate.toFixed(2);
+    document.getElementById('indicator-pitch').textContent = pitch.toFixed(2);
+    
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+
+  window.testVoice = function() {
+    const text = 'Hola, soy JARVIS. Esta es mi voz configurada. ¿Qué te parece?';
+    voiceManager.speak(text);
+  };
+
+  window.applyVoiceSettings = function() {
+    const rate = parseFloat(document.getElementById('rate-slider').value);
+    const pitch = parseFloat(document.getElementById('pitch-slider').value);
+    const select = document.getElementById('voice-select');
+    const voiceIndex = parseInt(select.value);
+    const voices = voiceManager.getVoices();
+    
+    voiceManager.rate = rate;
+    voiceManager.pitch = pitch;
+    
+    if (voiceIndex >= 0 && voiceIndex < voices.length) {
+      voiceManager.voice = voices[voiceIndex];
+    }
+    
+    document.getElementById('indicator-rate').textContent = rate.toFixed(2);
+    document.getElementById('indicator-pitch').textContent = pitch.toFixed(2);
+    document.getElementById('rate-value').textContent = rate.toFixed(2);
+    document.getElementById('pitch-value').textContent = pitch.toFixed(2);
+    
+    const status = voiceManager.getStatus();
+    document.getElementById('voice-status-voice').textContent = status.voice || 'Sin voz';
+    
+    showToast('✅ Configuración de voz aplicada');
+    
+    setTimeout(() => {
+      if (voiceManager.enabled) {
+        voiceManager.speak('Configuración aplicada correctamente.');
+      }
+    }, 300);
+  };
+
+  // ─── EVENTOS SLIDERS ─────────────────────────────────────
+  document.getElementById('rate-slider')?.addEventListener('input', function() {
+    document.getElementById('rate-value').textContent = parseFloat(this.value).toFixed(2);
+    document.getElementById('indicator-rate').textContent = parseFloat(this.value).toFixed(2);
+  });
+
+  document.getElementById('pitch-slider')?.addEventListener('input', function() {
+    document.getElementById('pitch-value').textContent = parseFloat(this.value).toFixed(2);
+    document.getElementById('indicator-pitch').textContent = parseFloat(this.value).toFixed(2);
+  });
+
+  document.getElementById('voice-select')?.addEventListener('change', function() {
+    const voices = voiceManager.getVoices();
+    const index = parseInt(this.value);
+    if (index >= 0 && index < voices.length) {
+      document.getElementById('voice-status-voice').textContent = voices[index].name;
+    }
+  });
+
+  function showToast(message) {
+    const existing = document.querySelector('.voice-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'voice-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 15, 30, 0.95);
+      border: 1px solid #00e5ff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      color: #e8edf5;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem;
+      z-index: 10000;
+      animation: fadeInUp 0.3s ease;
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.15);
+    `;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  // ============================================================
   // INICIALIZACIÓN
   // ============================================================
   function init() {
     console.log('🚀 Iniciando JARVIS...');
     console.log('🆔 Session ID persistente:', SESSION_ID);
     
-    // Visualizador 3D
     initVisualizer();
-    
-    // Socket
     connectSocket();
-    
-    // Micrófono
     setupMicrophone();
-    
-    // Drive
     setupDriveConverter();
+    setupVoiceControls();
     
-    // Chat
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     
@@ -610,13 +940,14 @@
       sendBtn.addEventListener('click', sendMessage);
     }
     
-    // Mensaje de bienvenida
     setTimeout(function() {
       displayMessage(
         '⚡ **JARVIS activo**\n\n' +
-        'Comandos: /help\n' +
+        'Comandos: /help, /voice, /voicestatus, /voicepanel\n' +
         'Agente: JARVIS (🧠 Planificador)\n\n' +
-        '💡 **Tu sesión es persistente:** Puedes refrescar la página y recordaré nuestra conversación.',
+        '💡 **Tu sesión es persistente:** Puedes refrescar la página y recordaré nuestra conversación.\n\n' +
+        '🔊 **Voz:** Usa /voice o el botón 🔊 para activar la voz de JARVIS.\n' +
+        '🎛️ **Ecualizador:** Usa /voicepanel o el botón 🎛️ para ajustar la voz.',
         'system'
       );
     }, 500);
@@ -624,7 +955,6 @@
     console.log('✅ JARVIS iniciado');
   }
 
-  // ─── EJECUTAR ──────────────────────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

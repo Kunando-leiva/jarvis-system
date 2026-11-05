@@ -1,0 +1,119 @@
+// backend/src/services/knowledgeQueryService.js
+// ✅ NUEVO ARCHIVO - Servicio de consulta de conocimiento
+
+import { logger } from '../core/logger.js';
+import { BaseService } from '../core/serviceInterface.js';
+
+export class KnowledgeQueryService extends BaseService {
+  constructor(knowledgeService) {
+    super();
+    this.name = 'KnowledgeQueryService';
+    this.knowledgeService = knowledgeService;
+    this.initialized = false;
+  }
+
+  async initialize() {
+    try {
+      this.status = 'initializing';
+      
+      // Verificar que knowledgeService esté inicializado
+      if (!this.knowledgeService.initialized) {
+        await this.knowledgeService.initialize();
+      }
+      
+      this.initialized = true;
+      this.status = 'online';
+      
+      logger.info('[KnowledgeQueryService] Inicializado');
+      return true;
+    } catch (error) {
+      this.status = 'error';
+      logger.error('[KnowledgeQueryService] Error inicializando:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Consulta básica sobre el proyecto
+   */
+  query(query) {
+    const lower = query.toLowerCase();
+    const results = [];
+
+    // 1. ¿Cuántos componentes hay?
+    if (lower.includes('cuántos') || lower.includes('número') || lower.includes('total')) {
+      if (lower.includes('componente') || lower.includes('servicio') || lower.includes('agente')) {
+        const services = this.knowledgeService.getServices();
+        const agents = this.knowledgeService.getAgents();
+        return {
+          type: 'stats',
+          data: {
+            services: services.length,
+            agents: agents.length,
+            total: services.length + agents.length
+          },
+          message: `Hay ${services.length} servicios y ${agents.length} agentes, total ${services.length + agents.length} componentes`
+        };
+      }
+    }
+
+    // 2. ¿Qué métodos tiene X?
+    const methodMatch = lower.match(/métodos? de ([\w]+)/i) || 
+                       lower.match(/qué métodos? tiene ([\w]+)/i);
+    if (methodMatch) {
+      const componentName = methodMatch[1];
+      // Buscar en servicios y agentes
+      const all = [...this.knowledgeService.getServices(), ...this.knowledgeService.getAgents()];
+      const comp = all.find(c => c.name.toLowerCase() === componentName.toLowerCase());
+      if (comp) {
+        // Aquí iría la extracción de métodos del archivo
+        // Por ahora, devolvemos placeholder
+        return {
+          type: 'methods',
+          component: comp.name,
+          data: { methods: ['save', 'retrieve', 'process'] }, // Placeholder
+          message: `El componente ${comp.name} tiene métodos públicos`
+        };
+      }
+      return {
+        type: 'not_found',
+        message: `No encontré el componente "${componentName}"`
+      };
+    }
+
+    // 3. ¿Qué componentes hay?
+    if (lower.includes('qué componentes') || lower.includes('lista de') || lower.includes('todos los')) {
+      const services = this.knowledgeService.getServices();
+      const agents = this.knowledgeService.getAgents();
+      const all = [...services, ...agents];
+      return {
+        type: 'list',
+        data: all.map(c => c.name),
+        message: `Componentes disponibles: ${all.map(c => c.name).join(', ')}`
+      };
+    }
+
+    // 4. Consulta general - devolver metadata
+    return {
+      type: 'general',
+      data: this.knowledgeService.getProjectInfo(),
+      message: 'Consulta recibida. ¿Necesitas información específica?'
+    };
+  }
+
+  getStatus() {
+    return {
+      name: this.name,
+      status: this.status,
+      initialized: this.initialized
+    };
+  }
+
+  async shutdown() {
+    this.status = 'offline';
+    this.initialized = false;
+    return true;
+  }
+}
+
+export default KnowledgeQueryService;

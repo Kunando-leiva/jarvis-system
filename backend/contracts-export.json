@@ -1,0 +1,2300 @@
+{
+  "generatedAt": "2026-09-03T02:16:15.718Z",
+  "totalComponents": 53,
+  "statistics": {
+    "totalMethods": 274,
+    "totalInherited": 0,
+    "totalDefined": 274,
+    "completeContracts": 0,
+    "incompleteContracts": 53,
+    "missingSignaturesTotal": 0
+  },
+  "contracts": {
+    "contextService": {
+      "exists": true,
+      "name": "contextService",
+      "type": "service",
+      "file": "contextService.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getContext",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "updateContext",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getProjectInfo",
+          "async": true,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "contextWindowManager": {
+      "exists": true,
+      "name": "contextWindowManager",
+      "type": "service",
+      "file": "contextWindowManager.js",
+      "publicMethods": [
+        {
+          "name": "buildWindow",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "editorBridgeService": {
+      "exists": true,
+      "name": "editorBridgeService",
+      "type": "service",
+      "file": "editorBridgeService.js",
+      "publicMethods": [
+        {
+          "name": "ejecutarEditor",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "crearProyectoDesdeGuion",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "executionService": {
+      "exists": true,
+      "name": "executionService",
+      "type": "service",
+      "file": "executionService.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executePlan",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executeTask",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getQueueStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "fooocusService": {
+      "exists": true,
+      "name": "fooocusService",
+      "type": "service",
+      "file": "fooocusService.js",
+      "publicMethods": [
+        {
+          "name": "checkStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generateImage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generateFallbackImage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getAvailableModels",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "instagramDMService": {
+      "exists": true,
+      "name": "instagramDMService",
+      "type": "service",
+      "file": "instagramDMService.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "instagramMetricsService": {
+      "exists": true,
+      "name": "instagramMetricsService",
+      "type": "service",
+      "file": "instagramMetricsService.js",
+      "publicMethods": [
+        {
+          "name": "getAccountMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getPostMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getCommentsMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "calculateEngagementRate",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearCache",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getInsightsByPeriod",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getBestTimes",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getPostsWithTimeline",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getSimulatedMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "forceRefresh",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "instagramMultiAccountService": {
+      "exists": true,
+      "name": "instagramMultiAccountService",
+      "type": "service",
+      "file": "instagramMultiAccountService.js",
+      "publicMethods": [
+        {
+          "name": "getCuentaActiva",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "setCuentaActiva",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getCuenta",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getCuentasDisponibles",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getConfigParaCuenta",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "verificarCuenta",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "obtenerMetricas",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "instagramPublishService": {
+      "exists": true,
+      "name": "instagramPublishService",
+      "type": "service",
+      "file": "instagramPublishService.js",
+      "publicMethods": [
+        {
+          "name": "scanScheduledContent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "detectMediaType",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractMetadata",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishMedia",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishVideoFromUrl",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishImageFromUrl",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishImage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishVideo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "publishText",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "waitForProcessing",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "buildCaption",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "markAsPublished",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractTitleFromContent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "actualizarVideoIdEnRespuestas",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "instagramService": {
+      "exists": true,
+      "name": "instagramService",
+      "type": "service",
+      "file": "instagramService.js",
+      "publicMethods": [
+        {
+          "name": "enviarRespuestaInstagram",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "jarvisMetricsService": {
+      "exists": true,
+      "name": "jarvisMetricsService",
+      "type": "service",
+      "file": "jarvisMetricsService.js",
+      "publicMethods": [
+        {
+          "name": "logAgentUsage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "logError",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getSimulatedMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getSimulatedMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "knowledgeQueryService": {
+      "exists": true,
+      "name": "knowledgeQueryService",
+      "type": "service",
+      "file": "knowledgeQueryService.js",
+      "publicMethods": [
+        {
+          "name": "query",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "longTermMemoryService": {
+      "exists": true,
+      "name": "longTermMemoryService",
+      "type": "service",
+      "file": "longTermMemoryService.js",
+      "publicMethods": [
+        {
+          "name": "saveEpisodicEvent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getRecentEpisodicEvents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "searchEpisodicEvents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveSemanticFact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getSemanticFact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "searchSemanticFacts",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveProceduralFact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getProceduralFact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "searchProceduralFacts",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "consolidateKnowledge",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "memoryService": {
+      "exists": true,
+      "name": "memoryService",
+      "type": "service",
+      "file": "memoryService.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "ensureSession",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveMessage",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getConversationHistory",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveContext",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getContext",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "savePublication",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getPublications",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveSystemState",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getSystemState",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearSession",
+          "async": true,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "n8nService": {
+      "exists": true,
+      "name": "n8nService",
+      "type": "service",
+      "file": "n8nService.js",
+      "publicMethods": [
+        {
+          "name": "sendActionToN8n",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "queryPlanner": {
+      "exists": true,
+      "name": "queryPlanner",
+      "type": "service",
+      "file": "queryPlanner.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "processQuery",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "reasoningService": {
+      "exists": true,
+      "name": "reasoningService",
+      "type": "service",
+      "file": "reasoningService.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "processQuery",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "createPlan",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executePlan",
+          "async": true,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "reflectionService": {
+      "exists": true,
+      "name": "reflectionService",
+      "type": "service",
+      "file": "reflectionService.js",
+      "publicMethods": [
+        {
+          "name": "initialize",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getStatus",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "reflect",
+          "async": true,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getReflections",
+          "async": true,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "retrievalPolicy": {
+      "exists": true,
+      "name": "retrievalPolicy",
+      "type": "service",
+      "file": "retrievalPolicy.js",
+      "publicMethods": [
+        {
+          "name": "getPlan",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "detectTaskType",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getTaskTypes",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "registerPlan",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "registerTaskDetection",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "skills": {
+      "exists": true,
+      "name": "skills",
+      "type": "service",
+      "file": "skills.js",
+      "publicMethods": [
+        {
+          "name": "calcularDescuento",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "storageService": {
+      "exists": true,
+      "name": "storageService",
+      "type": "service",
+      "file": "storageService.js",
+      "publicMethods": [
+        {
+          "name": "guardarGuion",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "guardarRespuesta",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "guardarCaption",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "guardarImagen",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "guardarVideo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "videoGeneratorService": {
+      "exists": true,
+      "name": "videoGeneratorService",
+      "type": "service",
+      "file": "videoGeneratorService.js",
+      "publicMethods": [
+        {
+          "name": "verificarDisponibilidad",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarImagenInvokeAI",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarImagenesInvokeAI",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarImagenAutomatic1111",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarImagenes",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarNarracion",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarVideo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "ejecutarEditor",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarVideoCompleto",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extraerPromptsDelGuion",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "voiceService": {
+      "exists": true,
+      "name": "voiceService",
+      "type": "service",
+      "file": "voiceService.js",
+      "publicMethods": [
+        {
+          "name": "textToSpeech",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "speechToText",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearCache",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "whatsappService": {
+      "exists": true,
+      "name": "whatsappService",
+      "type": "service",
+      "file": "whatsappService.js",
+      "publicMethods": [
+        {
+          "name": "init",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "waitForLogin",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveSession",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "startListening",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleMessage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "sendMessage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getQR",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "close",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "aiProvider": {
+      "exists": true,
+      "name": "aiProvider",
+      "type": "core",
+      "file": "aiProvider.js",
+      "publicMethods": [
+        {
+          "name": "generate",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "injectProviders",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "injectProviderFunctions",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "aiProvider.test": {
+      "exists": true,
+      "name": "aiProvider.test",
+      "type": "core",
+      "file": "aiProvider.test.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "contracts": {
+      "exists": true,
+      "name": "contracts",
+      "type": "core",
+      "file": "contracts.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "dependencyContainer": {
+      "exists": true,
+      "name": "dependencyContainer",
+      "type": "core",
+      "file": "dependencyContainer.js",
+      "publicMethods": [
+        {
+          "name": "register",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "initializeAll",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "shutdownAll",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "eventBus": {
+      "exists": true,
+      "name": "eventBus",
+      "type": "core",
+      "file": "eventBus.js",
+      "publicMethods": [
+        {
+          "name": "on",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "off",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "emit",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "emitSync",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getHistory",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearHistory",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "eventBus.test": {
+      "exists": true,
+      "name": "eventBus.test",
+      "type": "core",
+      "file": "eventBus.test.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "logger": {
+      "exists": true,
+      "name": "logger",
+      "type": "core",
+      "file": "logger.js",
+      "publicMethods": [
+        {
+          "name": "createTraceContext",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "withTraceContext",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "logger.test": {
+      "exists": true,
+      "name": "logger.test",
+      "type": "core",
+      "file": "logger.test.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "serviceInterface": {
+      "exists": true,
+      "name": "serviceInterface",
+      "type": "core",
+      "file": "serviceInterface.js",
+      "publicMethods": [],
+      "validation": {
+        "valid": true,
+        "warnings": [
+          "No se detectaron métodos públicos"
+        ]
+      }
+    },
+    "taskManager": {
+      "exists": true,
+      "name": "taskManager",
+      "type": "core",
+      "file": "taskManager.js",
+      "publicMethods": [
+        {
+          "name": "create",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "start",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "complete",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "fail",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "update",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getResult",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "list",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "cancel",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "cleanOldTasks",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "toolRegistry": {
+      "exists": true,
+      "name": "toolRegistry",
+      "type": "core",
+      "file": "toolRegistry.js",
+      "publicMethods": [
+        {
+          "name": "register",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "list",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "execute",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "componentAnalyzer": {
+      "exists": true,
+      "name": "componentAnalyzer",
+      "type": "knowledge",
+      "file": "componentAnalyzer.js",
+      "publicMethods": [
+        {
+          "name": "analyze",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "methodName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "methodName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "methodName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "methodName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "ContractValidator": {
+      "exists": true,
+      "name": "ContractValidator",
+      "type": "knowledge",
+      "file": "ContractValidator.js",
+      "publicMethods": [
+        {
+          "name": "validateAll",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getHistory",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getLastValidation",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generateReport",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "dependencyAnalyzer": {
+      "exists": true,
+      "name": "dependencyAnalyzer",
+      "type": "knowledge",
+      "file": "dependencyAnalyzer.js",
+      "publicMethods": [
+        {
+          "name": "analyze",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDependencies",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDependents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "dependencyGraph": {
+      "exists": true,
+      "name": "dependencyGraph",
+      "type": "knowledge",
+      "file": "dependencyGraph.js",
+      "publicMethods": [
+        {
+          "name": "buildGraph",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDependencies",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDependents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getGraph",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "index": {
+      "exists": true,
+      "name": "index",
+      "type": "agent",
+      "file": "index.js",
+      "publicMethods": [
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractTasks",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executeTask",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "formatResults",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleFullAutomation",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleContentPlan",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "register",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "unregister",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getAgent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getAllAgents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getActiveAgents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "processMessage",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getHistory",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "on",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "notify",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "forEach",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "createCustomAgent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "methodValidator": {
+      "exists": true,
+      "name": "methodValidator",
+      "type": "knowledge",
+      "file": "methodValidator.js",
+      "publicMethods": [
+        {
+          "name": "isValidMethodName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "filterValidMethods",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "publicContractService": {
+      "exists": true,
+      "name": "publicContractService",
+      "type": "knowledge",
+      "file": "publicContractService.js",
+      "publicMethods": [
+        {
+          "name": "getContract",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getAllContracts",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearCache",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "signatureExtractor": {
+      "exists": true,
+      "name": "signatureExtractor",
+      "type": "knowledge",
+      "file": "signatureExtractor.js",
+      "publicMethods": [
+        {
+          "name": "extract",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractAll",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "dependencyResolver": {
+      "exists": true,
+      "name": "dependencyResolver",
+      "type": "resolver",
+      "file": "dependencyResolver.js",
+      "publicMethods": [
+        {
+          "name": "findDependents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findDependencies",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findCircularDependencies",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findIsolatedComponents",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDependencyGraph",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearCache",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "impactResolver": {
+      "exists": true,
+      "name": "impactResolver",
+      "type": "resolver",
+      "file": "impactResolver.js",
+      "publicMethods": [
+        {
+          "name": "analyzeComponentImpact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "analyzeMethodImpact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "compareImpact",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "clearCache",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "methodResolver": {
+      "exists": true,
+      "name": "methodResolver",
+      "type": "resolver",
+      "file": "methodResolver.js",
+      "publicMethods": [
+        {
+          "name": "findByName",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findByPattern",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findByType",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "findByParameter",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "responseContract": {
+      "exists": true,
+      "name": "responseContract",
+      "type": "resolver",
+      "file": "responseContract.js",
+      "publicMethods": [
+        {
+          "name": "createSuccessResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "createErrorResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "createMethodSuccessResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "BaseAgent": {
+      "exists": true,
+      "name": "BaseAgent",
+      "type": "agent",
+      "file": "BaseAgent.js",
+      "publicMethods": [
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "toggle",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "contentCreatorAgent": {
+      "exists": true,
+      "name": "contentCreatorAgent",
+      "type": "agent",
+      "file": "contentCreatorAgent.js",
+      "publicMethods": [
+        {
+          "name": "buildPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractTitleFromPrompt",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractRespuestas",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarGuionReels",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "generarDescripcionVisual",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "growthMarketerAgent": {
+      "exists": true,
+      "name": "growthMarketerAgent",
+      "type": "agent",
+      "file": "growthMarketerAgent.js",
+      "publicMethods": [
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleAnalizar",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleRecomendar",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleTendencias",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleCrecimiento",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleMonetizar",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleEmbudo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleCompetencia",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleGancho",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handlePerfil",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "instagramAutomatorAgent": {
+      "exists": true,
+      "name": "instagramAutomatorAgent",
+      "type": "agent",
+      "file": "instagramAutomatorAgent.js",
+      "publicMethods": [
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "detectIntent",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executeFullAutomation",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executeContentPlan",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "executeEngagementStrategy",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "systemMonitorAgent": {
+      "exists": true,
+      "name": "systemMonitorAgent",
+      "type": "agent",
+      "file": "systemMonitorAgent.js",
+      "publicMethods": [
+        {
+          "name": "startMonitoring",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "collectMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getCPUInfo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getMemoryInfo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getDiskInfo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getProcessInfo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getNetworkInfo",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getTemperature",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "analyzeMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "quickHealthCheck",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "saveMetrics",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getReport",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleReport",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleCPU",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleMemory",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleDisk",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleProcesses",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleAlerts",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleEnergy",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getHelpText",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "formatBytes",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "formatUptime",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getCPURecommendations",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "getRecommendations",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    },
+    "videoGeneratorAgent": {
+      "exists": true,
+      "name": "videoGeneratorAgent",
+      "type": "agent",
+      "file": "videoGeneratorAgent.js",
+      "publicMethods": [
+        {
+          "name": "setAgentRegistry",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleResponse",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleImageGeneration",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleVideoGeneration",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleFullAutomation",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handlePublish",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleStatusCheck",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "handleListModels",
+          "async": false,
+          "inherited": false,
+          "params": []
+        },
+        {
+          "name": "extractPromptsFromScript",
+          "async": false,
+          "inherited": false,
+          "params": []
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "warnings": []
+      }
+    }
+  }
+}
