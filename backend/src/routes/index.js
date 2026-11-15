@@ -7,6 +7,7 @@ import whatsappRoutes from './whatsappRoutes.js';
 import metricsRoutes from './metricsRoutes.js';
 import webhookRoutes from './webhookRoutes.js';
 import publishRoutes from './publishRoutes.js';
+import instagramStoryRoutes from './instagramStoryRoutes.js';
 import memoryRoutes from './memoryRoutes.js';
 import reasoningRoutes from './reasoningRoutes.js';
 
@@ -18,6 +19,7 @@ router.use('/', whatsappRoutes);
 router.use('/', metricsRoutes);
 router.use('/', webhookRoutes);
 router.use('/', publishRoutes);
+router.use('/', instagramStoryRoutes);
 router.use('/', memoryRoutes);
 router.use('/api', reasoningRoutes);
 
