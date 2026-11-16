@@ -11,6 +11,7 @@ const STATUSES = Object.freeze({
   PROCESSING: 'PROCESSING',
   PUBLISHED: 'PUBLISHED',
   MANUAL_ACTION_REQUIRED: 'MANUAL_ACTION_REQUIRED',
+  MANUALLY_PUBLISHED: 'MANUALLY_PUBLISHED',
   FAILED: 'FAILED'
 });
 
@@ -161,9 +162,54 @@ class InstagramStoryService {
     this.write(record);
   }
 
+  async notifyManualAction(record) {
+    const sent = await sendActionToN8n({
+      action: 'instagram_story_manual_action_required',
+      payload: {
+        id: record.id,
+        title: record.title,
+        mediaType: record.mediaType,
+        mediaUrl: record.mediaUrl,
+        accountId: record.accountId,
+        linkUrl: record.linkUrl,
+        linkLabel: record.linkLabel,
+        scheduledAt: record.scheduledAt,
+        instructions: 'Publicá esta historia desde Instagram y agregá el sticker de enlace con la URL y el texto indicados. La API oficial no permite crear ese sticker.'
+      },
+      textResponse: `La historia "${record.title}" está lista. Requiere agregar manualmente el sticker de enlace en Instagram.`
+    });
+    if (sent) {
+      record.notificationSentAt = new Date().toISOString();
+      record.updatedAt = record.notificationSentAt;
+      this.write(record);
+    }
+  }
+
+  async notifyPublishFailure(record) {
+    const sent = await sendActionToN8n({
+      action: 'instagram_story_publish_failed',
+      payload: { id: record.id, title: record.title, accountId: record.accountId, error: record.error },
+      textResponse: `Falló la publicación de la historia "${record.title}".`
+    });
+    if (sent) {
+      record.notificationSentAt = new Date().toISOString();
+      record.updatedAt = record.notificationSentAt;
+      this.write(record);
+    }
+  }
+
   async processDue() {
     const now = Date.now();
     for (const record of this.list()) {
+      // Reintentar avisos que n8n no confirmó, sin volver a publicar el medio.
+      if (record.status === STATUSES.MANUAL_ACTION_REQUIRED && !record.notificationSentAt) {
+        await this.notifyManualAction(record);
+        continue;
+      }
+      if (record.status === STATUSES.FAILED && !record.notificationSentAt) {
+        await this.notifyPublishFailure(record);
+        continue;
+      }
       if (record.status !== STATUSES.SCHEDULED || Date.parse(record.scheduledAt) > now) continue;
 
       // Meta's official publishing API does not support the interactive link sticker.
@@ -171,23 +217,9 @@ class InstagramStoryService {
       if (record.linkUrl) {
         record.status = STATUSES.MANUAL_ACTION_REQUIRED;
         record.updatedAt = new Date().toISOString();
-        record.notificationSentAt = record.updatedAt;
+        record.notificationSentAt = null;
         this.write(record);
-        await sendActionToN8n({
-          action: 'instagram_story_manual_action_required',
-          payload: {
-            id: record.id,
-            title: record.title,
-            mediaType: record.mediaType,
-            mediaUrl: record.mediaUrl,
-            accountId: record.accountId,
-            linkUrl: record.linkUrl,
-            linkLabel: record.linkLabel,
-            scheduledAt: record.scheduledAt,
-            instructions: 'Publicá esta historia desde Instagram y agregá el sticker de enlace con la URL y el texto indicados. La API oficial no permite crear ese sticker.'
-          },
-          textResponse: `La historia "${record.title}" está lista. Requiere agregar manualmente el sticker de enlace en Instagram.`
-        });
+        await this.notifyManualAction(record);
         continue;
       }
 
@@ -199,13 +231,10 @@ class InstagramStoryService {
       } catch (error) {
         record.status = STATUSES.FAILED;
         record.error = error.response?.data?.error?.message || error.message;
+        record.notificationSentAt = null;
         record.updatedAt = new Date().toISOString();
         this.write(record);
-        await sendActionToN8n({
-          action: 'instagram_story_publish_failed',
-          payload: { id: record.id, title: record.title, accountId: record.accountId, error: record.error },
-          textResponse: `Falló la publicación de la historia "${record.title}".`
-        });
+        await this.notifyPublishFailure(record);
       }
     }
   }
@@ -225,7 +254,7 @@ class InstagramStoryService {
       error.statusCode = 409;
       throw error;
     }
-    record.status = STATUSES.PUBLISHED;
+    record.status = STATUSES.MANUALLY_PUBLISHED;
     record.instagramMediaId = instagramMediaId;
     record.updatedAt = new Date().toISOString();
     record.manualCompletedAt = record.updatedAt;
