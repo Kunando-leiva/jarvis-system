@@ -41,6 +41,9 @@ No agregar credenciales al repositorio. Verificar elegibilidad de publicación d
 
 ## Limitaciones conocidas
 
-- Esta primera entrega agrega endpoints de backend; la interfaz frontend y el workflow de notificación n8n deben conectarse en una siguiente iteración.
+- El dock `frontend/agent-docks/dock-instagram-automator.js` ya incluye formulario de programación, listado de historias y confirmación manual.
+- El workflow de notificación n8n debe configurarse y probarse para las acciones indicadas.
 - El estado `MANUALLY_PUBLISHED` indica que el usuario confirmó la publicación manual; el backend no puede verificarla automáticamente. `PUBLISHED` queda reservado para publicaciones confirmadas por Graph API.
 - Una historia con enlace se pausa para acción humana y no se publica sin el sticker.
+- El formulario requiere por ahora una URL HTTPS pública del medio; todavía no incorpora carga directa de archivos.
+- Los endpoints deben quedar protegidos por autenticación antes de exponerse mediante túnel o producción.
