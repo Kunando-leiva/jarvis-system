@@ -33,7 +33,7 @@ Sin `linkUrl`, el backend publica la historia mediante Graph API. Los archivos d
 
 ## Variables de entorno
 
-- `META_GRAPH_API_VERSION` (opcional, por defecto `v26.0`)
+- `META_GRAPH_API_VERSION` (opcional, por defecto `v27.0`)
 - `VAULT_PATH`
 - Tokens e IDs de cuenta existentes: `INSTAGRAM_ACCESS_TOKEN_VALHALLA`, `INSTAGRAM_BUSINESS_ID_VALHALLA`, `INSTAGRAM_ACCESS_TOKEN_ALHORNO`, `INSTAGRAM_BUSINESS_ID_ALHORNO`
 
