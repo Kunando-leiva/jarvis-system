@@ -9,7 +9,7 @@ Este módulo agrega una cola de historias al backend actual. No reemplaza el ser
 - `POST /api/instagram/stories`: crea una historia programada.
 - `GET /api/instagram/stories`: lista historias y estados.
 - `POST /api/instagram/stories/process-due`: ejecuta manualmente el procesador (útil para pruebas).
-- `POST /api/instagram/stories/:id/manual-complete`: marca como completada una historia publicada desde la app de Instagram.
+- `POST /api/instagram/stories/:id/manual-complete`: registra la confirmación manual de una historia publicada desde Instagram.
 
 Ejemplo:
 
@@ -33,7 +33,7 @@ Sin `linkUrl`, el backend publica la historia mediante Graph API. Los archivos d
 
 ## Variables de entorno
 
-- `META_GRAPH_API_VERSION` (opcional, por defecto `v22.0`)
+- `META_GRAPH_API_VERSION` (opcional, por defecto `v26.0`)
 - `VAULT_PATH`
 - Tokens e IDs de cuenta existentes: `INSTAGRAM_ACCESS_TOKEN_VALHALLA`, `INSTAGRAM_BUSINESS_ID_VALHALLA`, `INSTAGRAM_ACCESS_TOKEN_ALHORNO`, `INSTAGRAM_BUSINESS_ID_ALHORNO`
 
@@ -42,5 +42,5 @@ No agregar credenciales al repositorio. Verificar elegibilidad de publicación d
 ## Limitaciones conocidas
 
 - Esta primera entrega agrega endpoints de backend; la interfaz frontend y el workflow de notificación n8n deben conectarse en una siguiente iteración.
-- El estado `PUBLISHED` en `manual-complete` es una confirmación ingresada por el usuario; el backend no puede verificar una publicación manual.
+- El estado `MANUALLY_PUBLISHED` indica que el usuario confirmó la publicación manual; el backend no puede verificarla automáticamente. `PUBLISHED` queda reservado para publicaciones confirmadas por Graph API.
 - Una historia con enlace se pausa para acción humana y no se publica sin el sticker.
