@@ -5,7 +5,7 @@ const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/we
  * Se ejecuta en segundo plano: no bloquea la respuesta al frontend.
  *
  * @param {object} actionPayload - Objeto completo { action, payload, textResponse }.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} true solo cuando el webhook responde 2xx.
  */
 export async function sendActionToN8n(actionPayload) {
   try {
@@ -17,11 +17,13 @@ export async function sendActionToN8n(actionPayload) {
 
     if (!res.ok) {
       console.error(`[n8nService] Webhook respondió con status ${res.status}`);
-      return;
+      return false;
     }
 
     console.log(`[n8nService] Acción "${actionPayload.action}" enviada a n8n correctamente.`);
+    return true;
   } catch (err) {
     console.error('[n8nService] Error al enviar acción a n8n:', err.message);
+    return false;
   }
 }
