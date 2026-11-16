@@ -23,6 +23,7 @@ class InstagramStoryService {
       'Historias'
     );
     this.started = false;
+    this.processing = false;
   }
 
   ensureDirectory() {
@@ -199,8 +200,12 @@ class InstagramStoryService {
   }
 
   async processDue() {
-    const now = Date.now();
-    for (const record of this.list()) {
+    // Evita que dos ticks del cron procesen la misma historia en paralelo.
+    if (this.processing) return;
+    this.processing = true;
+    try {
+      const now = Date.now();
+      for (const record of this.list()) {
       // Reintentar avisos que n8n no confirmó, sin volver a publicar el medio.
       if (record.status === STATUSES.MANUAL_ACTION_REQUIRED && !record.notificationSentAt) {
         await this.notifyManualAction(record);
@@ -236,6 +241,9 @@ class InstagramStoryService {
         this.write(record);
         await this.notifyPublishFailure(record);
       }
+      }
+    } finally {
+      this.processing = false;
     }
   }
 
